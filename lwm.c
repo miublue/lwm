@@ -10,12 +10,13 @@
 // client list can be resized anyhow
 #define NUM_CLIENTS 256
 
-Display *display;
-Window root;
-unsigned int screen_w, screen_h;
-workspace_t workspaces[10] = {0};
-XColor border_normal, border_select;
-int cur_ws = 0;
+static Display *display;
+static Window root;
+static unsigned int screen_w, screen_h;
+static workspace_t workspaces[10] = {0};
+static XColor border_normal, border_select;
+static int cur_ws = 0;
+static const int topgap = BOTTOMBAR? 0 : TOPGAP;
 
 #define CURWS workspaces[cur_ws]
 #define WSWIN(wn) CURWS.list[wn]
@@ -26,20 +27,18 @@ static void (*events[LASTEvent])(XEvent *ev) = {
     [MapRequest]       = map_request,
     [UnmapNotify]      = unmap_notify,
     [DestroyNotify]    = destroy_notify,
-	[EnterNotify]      = enter_notify,
 };
 
 void exec(const arg_t arg) {
-    if (fork()) return;
+    if (fork() != 0) return;
     if (display) close(ConnectionNumber(display));
-
     setsid();
     execvp((char*)arg.com[0], (char**)arg.com);
 }
 
 void tile_mode(const arg_t arg) {
+    if (CURWS.size) WSWIN(CURWS.cur).is_full = 0;
     CURWS.mode = arg.i;
-    WSWIN(CURWS.cur).is_full = 0;
     tile();
 }
 
@@ -92,7 +91,8 @@ void win_kill(const arg_t arg) {
 void win_full(const arg_t arg) {
     if (CURWS.size == 0) return;
     if (WSWIN(CURWS.cur).is_full = !WSWIN(CURWS.cur).is_full)
-        XMoveResizeWindow(display, WSWIN(CURWS.cur).wn, -BORDER_SIZE, -BORDER_SIZE, screen_w, screen_h);
+        XMoveResizeWindow(display, WSWIN(CURWS.cur).wn,
+            -BORDER_SIZE, -BORDER_SIZE, screen_w, screen_h);
     else tile();
 }
 
@@ -109,6 +109,7 @@ void win_to_ws(const arg_t arg) {
 
 void ws_go(const arg_t arg) {
     if (arg.i == cur_ws) return;
+    // if (CURWS.size) WSWIN(CURWS.cur).is_full = 0;
     for (int i = 0; i < CURWS.size; ++i)
         XUnmapWindow(display, WSWIN(i).wn);
 
@@ -132,15 +133,14 @@ static void configure_request(XEvent *ev) {
     };
 
     XConfigureWindow(display, cr->window, cr->value_mask, &ch);
+    tile();
 }
 
 static void key_press(XEvent *ev) {
     KeySym keysym = XkbKeycodeToKeysym(display, ev->xkey.keycode, 0, 0);
-
     for (int i = 0; i < LEN(keys); ++i) {
-        if (keys[i].keysym == keysym && mod_clean(keys[i].mod) == mod_clean(ev->xkey.state)) {
+        if (keys[i].keysym == keysym && mod_clean(keys[i].mod) == mod_clean(ev->xkey.state))
             keys[i].fun(keys[i].arg);
-        }
     }
 }
 
@@ -167,24 +167,18 @@ static void destroy_notify(XEvent *ev) {
     win_del(w);
 }
 
-static void enter_notify(XEvent *ev) {
-    int w = client_from_window(ev->xcrossing.window);
-    if (w != -1) win_focus(w);
-}
-
 static void grab_input() {
     XUngrabKey(display, AnyKey, AnyModifier, root);
     KeyCode code;
 
     for (int i = 0; i < LEN(keys); ++i) {
-        if (code = XKeysymToKeycode(display, keys[i].keysym)) {
-            XGrabKey(display, code, keys[i].mod, root,
-                    True, GrabModeAsync, GrabModeAsync);
-        }
+        if ((code = XKeysymToKeycode(display, keys[i].keysym)))
+            XGrabKey(display, code, keys[i].mod, root, True, GrabModeAsync, GrabModeAsync);
     }
 }
 
 static void win_add(Window w) {
+    if (CURWS.size) WSWIN(CURWS.cur).is_full = 0;
     if (++CURWS.size >= CURWS.alloc)
         CURWS.list = realloc(CURWS.list, (CURWS.alloc += NUM_CLIENTS));
     client_t client = {
@@ -197,14 +191,11 @@ static void win_add(Window w) {
 static void win_del(int w) {
     if (w < 0 || CURWS.size == 0) return;
     CURWS.size--;
-    for (int i = w; i < CURWS.size; ++i) {
+    for (int i = w; i < CURWS.size; ++i)
         CURWS.list[i] = CURWS.list[i+1];
-    }
 
-    if (CURWS.size == 0)
-        CURWS.cur = 0;
-    else if (CURWS.cur >= CURWS.size)
-        CURWS.cur = CURWS.size-1;
+    if (CURWS.size == 0) CURWS.cur = 0;
+    else if (CURWS.cur >= CURWS.size) CURWS.cur = CURWS.size-1;
     win_focus(CURWS.cur);
     tile();
 }
@@ -228,6 +219,8 @@ static void win_focus(int w) {
 }
 
 static void tile() {
+    if (CURWS.size && WSWIN(CURWS.cur).is_full) return;
+
     switch (CURWS.mode) {
     case MODE_MONOCLE:
         tile_monocle();
@@ -241,13 +234,8 @@ static void tile() {
 static void tile_monocle() {
     const int gapsz = (BORDER_SIZE+GAPSIZE)*2;
     for (int i = 0; i < CURWS.size; ++i) {
-        XMoveResizeWindow(display, WSWIN(i).wn, GAPSIZE, TOPGAP+GAPSIZE,
-            screen_w-gapsz, screen_h-TOPGAP-gapsz);
-
-        /*
-        XMoveResizeWindow(display, WSWIN(i).wn, 0, TOPGAP,
-            screen_w-(BORDER_SIZE*2), screen_h-TOPGAP-(BORDER_SIZE*2));
-        */
+        XMoveResizeWindow(display, WSWIN(i).wn, GAPSIZE, topgap+GAPSIZE,
+                screen_w-gapsz, screen_h-TOPGAP-gapsz);
     }
 }
 
@@ -255,23 +243,18 @@ static void tile_nstack() {
     if (CURWS.size < 2)
         return tile_monocle();
 
+    const int gapsz = (BORDER_SIZE+GAPSIZE)*2;
     int y_space = screen_h-TOPGAP-GAPSIZE;
     int stack_w = screen_w-CURWS.master_w;
     int stack_h, master_h;
-    const int gapsz = (BORDER_SIZE+GAPSIZE)*2;
 
     // if there are only master clients or if there is only stack
     if (CURWS.nmaster >= CURWS.size || CURWS.nmaster == 0) {
         stack_h = y_space / CURWS.size;
         for (int i = 0; i < CURWS.size; ++i) {
             XMoveResizeWindow(display, WSWIN(i).wn,
-                GAPSIZE, TOPGAP + stack_h*i + GAPSIZE,
+                GAPSIZE, topgap+GAPSIZE + stack_h*i,
                 screen_w-gapsz, stack_h-(BORDER_SIZE*2)-GAPSIZE);
-            /*
-            XMoveResizeWindow(display, WSWIN(i).wn,
-                0, TOPGAP + stack_h*i,
-                screen_w-(BORDER_SIZE*2), stack_h-(BORDER_SIZE*2));
-            */
         }
         return;
     }
@@ -281,23 +264,13 @@ static void tile_nstack() {
 
     for (int i = 0; i < CURWS.nmaster; ++i) {
         XMoveResizeWindow(display, WSWIN(i).wn,
-            GAPSIZE, TOPGAP+GAPSIZE + master_h*i,
+            GAPSIZE, topgap+GAPSIZE + master_h*i,
             CURWS.master_w-(BORDER_SIZE*2)-GAPSIZE, master_h-(BORDER_SIZE*2)-GAPSIZE);
-        /*
-        XMoveResizeWindow(display, WSWIN(i).wn,
-            0, TOPGAP+0 + master_h*i,
-            CURWS.master_w-(BORDER_SIZE*2), master_h-(BORDER_SIZE*2));
-        */
     }
     for (int i = CURWS.nmaster; i < CURWS.size; ++i) {
         XMoveResizeWindow(display, WSWIN(i).wn,
-            CURWS.master_w+GAPSIZE, TOPGAP + stack_h*(i-CURWS.nmaster)+GAPSIZE,
+            CURWS.master_w+GAPSIZE, topgap+GAPSIZE + stack_h*(i-CURWS.nmaster),
             stack_w-gapsz, stack_h-(BORDER_SIZE*2)-GAPSIZE);
-        /*
-        XMoveResizeWindow(display, WSWIN(i).wn,
-            CURWS.master_w, TOPGAP + stack_h*(i-CURWS.nmaster),
-            stack_w-(BORDER_SIZE*2), stack_h-(BORDER_SIZE*2));
-        */
     }
 }
 
@@ -314,6 +287,7 @@ int main() {
 
     signal(SIGCHLD, SIG_IGN);
     XSetErrorHandler(xerror);
+    setenv("LUI", "1", 1);
     system(INIT_SCRIPT);
 
     int s = DefaultScreen(display);
@@ -335,7 +309,7 @@ int main() {
         workspaces[i].alloc = NUM_CLIENTS;
         workspaces[i].list = calloc(NUM_CLIENTS, sizeof(client_t));
         workspaces[i].mode = DEFAULT_MODE;
-        workspaces[i].master_w = screen_w * MASTER_W;
+        workspaces[i].master_w = screen_w * MASTERW;
         workspaces[i].nmaster = NMASTER;
     }
 

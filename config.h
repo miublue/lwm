@@ -2,9 +2,10 @@
 #define CONFIG_H
 #include <X11/Xlib.h>
 
+#define BOTTOMBAR 0
 #define TOPGAP 18
 #define GAPSIZE 5
-#define MASTER_W 0.5
+#define MASTERW 0.5
 #define NMASTER 1
 #define DEFAULT_MODE MODE_NSTACK
 #define BORDER_SIZE 2

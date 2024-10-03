@@ -21,9 +21,7 @@ typedef struct {
 typedef struct {
     size_t alloc, size;
     client_t *list;
-    int cur, mode;
-    int master_w;
-    int nmaster;
+    int cur, mode, master_w, nmaster;
 } workspace_t;
 
 typedef struct {
@@ -55,7 +53,6 @@ static void key_press(XEvent *ev);
 static void map_request(XEvent *ev);
 static void unmap_notify(XEvent *ev);
 static void destroy_notify(XEvent *ev);
-static void enter_notify(XEvent *ev);
 
 static void grab_input();
 static void win_add(Window w);
