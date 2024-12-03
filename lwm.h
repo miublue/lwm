@@ -8,10 +8,7 @@
 #define mod_clean(mask) (mask & \
         (ShiftMask|ControlMask|Mod1Mask|Mod2Mask|Mod3Mask|Mod4Mask|Mod5Mask))
 
-enum {
-    MODE_MONOCLE,
-    MODE_NSTACK,
-};
+enum { MODE_MONOCLE, MODE_NSTACK, };
 
 typedef struct {
     Window wn;
@@ -21,7 +18,7 @@ typedef struct {
 typedef struct {
     size_t alloc, size;
     client_t *list;
-    int cur, mode, master_w, nmaster;
+    int cur, mode, masterw, nmaster;
 } workspace_t;
 
 typedef struct {

@@ -43,10 +43,10 @@ void tile_mode(const arg_t arg) {
 }
 
 void incmaster(const arg_t arg) {
-    if (CURWS.master_w < 100 && arg.i < 0) return;
-    if (CURWS.master_w > screen_w-100 && arg.i > 0) return;
+    if (CURWS.masterw < 100 && arg.i < 0) return;
+    if (CURWS.masterw > screen_w-100 && arg.i > 0) return;
     if (WSWIN(CURWS.cur).is_full) return;
-    CURWS.master_w += arg.i;
+    CURWS.masterw += arg.i;
     tile();
 }
 
@@ -109,30 +109,25 @@ void win_to_ws(const arg_t arg) {
 
 void ws_go(const arg_t arg) {
     if (arg.i == cur_ws) return;
-    // if (CURWS.size) WSWIN(CURWS.cur).is_full = 0;
     for (int i = 0; i < CURWS.size; ++i)
         XUnmapWindow(display, WSWIN(i).wn);
-
     cur_ws = arg.i;
     for (int i = 0; i < CURWS.size; ++i)
         XMapWindow(display, WSWIN(i).wn);
-
     if (CURWS.size) win_focus(CURWS.cur);
     tile();
 }
 
 static void configure_request(XEvent *ev) {
     XConfigureRequestEvent *cr = &ev->xconfigurerequest;
-    XWindowChanges ch = {
+    XConfigureWindow(display, cr->window, cr->value_mask, &(XWindowChanges) {
         .x = cr->x,
         .y = cr->y,
         .width = cr->width,
         .height = cr->height,
         .sibling = cr->above,
         .stack_mode = cr->detail,
-    };
-
-    XConfigureWindow(display, cr->window, cr->value_mask, &ch);
+    });
     tile();
 }
 
@@ -178,6 +173,7 @@ static void grab_input() {
 }
 
 static void win_add(Window w) {
+    if (w == None) return;
     if (CURWS.size) WSWIN(CURWS.cur).is_full = 0;
     if (++CURWS.size >= CURWS.alloc)
         CURWS.list = realloc(CURWS.list, (CURWS.alloc += NUM_CLIENTS));
@@ -193,7 +189,6 @@ static void win_del(int w) {
     CURWS.size--;
     for (int i = w; i < CURWS.size; ++i)
         CURWS.list[i] = CURWS.list[i+1];
-
     if (CURWS.size == 0) CURWS.cur = 0;
     else if (CURWS.cur >= CURWS.size) CURWS.cur = CURWS.size-1;
     win_focus(CURWS.cur);
@@ -220,14 +215,9 @@ static void win_focus(int w) {
 
 static void tile() {
     if (CURWS.size && WSWIN(CURWS.cur).is_full) return;
-
     switch (CURWS.mode) {
-    case MODE_MONOCLE:
-        tile_monocle();
-        break;
-    case MODE_NSTACK:
-        tile_nstack();
-        break;
+    case MODE_MONOCLE: return tile_monocle();
+    case MODE_NSTACK: return tile_nstack();
     }
 }
 
@@ -245,7 +235,7 @@ static void tile_nstack() {
 
     const int gapsz = (BORDER_SIZE+GAPSIZE)*2;
     int y_space = screen_h-TOPGAP-GAPSIZE;
-    int stack_w = screen_w-CURWS.master_w;
+    int stack_w = screen_w-CURWS.masterw;
     int stack_h, master_h;
 
     // if there are only master clients or if there is only stack
@@ -265,11 +255,11 @@ static void tile_nstack() {
     for (int i = 0; i < CURWS.nmaster; ++i) {
         XMoveResizeWindow(display, WSWIN(i).wn,
             GAPSIZE, topgap+GAPSIZE + master_h*i,
-            CURWS.master_w-(BORDER_SIZE*2)-GAPSIZE, master_h-(BORDER_SIZE*2)-GAPSIZE);
+            CURWS.masterw-(BORDER_SIZE*2)-GAPSIZE, master_h-(BORDER_SIZE*2)-GAPSIZE);
     }
     for (int i = CURWS.nmaster; i < CURWS.size; ++i) {
         XMoveResizeWindow(display, WSWIN(i).wn,
-            CURWS.master_w+GAPSIZE, topgap+GAPSIZE + stack_h*(i-CURWS.nmaster),
+            CURWS.masterw+GAPSIZE, topgap+GAPSIZE + stack_h*(i-CURWS.nmaster),
             stack_w-gapsz, stack_h-(BORDER_SIZE*2)-GAPSIZE);
     }
 }
@@ -282,12 +272,9 @@ static int client_from_window(Window wn) {
 }
 
 int main() {
-    if (!(display = XOpenDisplay(0)))
-        return 1;
-
+    if (!(display = XOpenDisplay(0))) return 1;
     signal(SIGCHLD, SIG_IGN);
     XSetErrorHandler(xerror);
-    setenv("LUI", "1", 1);
     system(INIT_SCRIPT);
 
     int s = DefaultScreen(display);
@@ -305,11 +292,11 @@ int main() {
     grab_input();
 
     for (int i = 0; i < 10; ++i) {
-        workspaces[i].size = workspaces[i].cur = 0;
         workspaces[i].alloc = NUM_CLIENTS;
+        workspaces[i].size = workspaces[i].cur = 0;
         workspaces[i].list = calloc(NUM_CLIENTS, sizeof(client_t));
         workspaces[i].mode = DEFAULT_MODE;
-        workspaces[i].master_w = screen_w * MASTERW;
+        workspaces[i].masterw = screen_w * MASTERW;
         workspaces[i].nmaster = NMASTER;
     }
 
