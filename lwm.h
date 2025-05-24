@@ -1,5 +1,5 @@
-#ifndef LWM_H
-#define LWM_H
+#ifndef __LWM_H
+#define __LWM_H
 #include <X11/Xlib.h>
 
 #define MIN(a, b) ((a) < (b)? (a) : (b))
