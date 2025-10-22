@@ -8,6 +8,7 @@
 #define MASTERW 0.5
 #define NMASTER 1
 #define DEFAULT_MODE MODE_NSTACK
+#define FOCUS_ON_HOVER 1
 #define BORDER_SIZE 2
 #define BORDER_NORMAL "#666666"
 #define BORDER_SELECT "#ff5599"

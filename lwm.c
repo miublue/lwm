@@ -25,6 +25,7 @@ static void (*events[LASTEvent])(XEvent *ev) = {
     [ConfigureRequest] = configure_request,
     [KeyPress]         = key_press,
     [MapRequest]       = map_request,
+    [EnterNotify]      = enter_notify,
     [UnmapNotify]      = unmap_notify,
     [DestroyNotify]    = destroy_notify,
 };
@@ -150,6 +151,14 @@ static void map_request(XEvent *ev) {
     XMapWindow(display, wn);
     win_focus(CURWS.size-1);
     tile();
+}
+
+static void enter_notify(XEvent *ev) {
+#if FOCUS_ON_HOVER
+    while (XCheckTypedEvent(display, EnterNotify, ev));
+    int c = client_from_window(ev->xcrossing.window);
+    if (c != -1) win_focus(c);
+#endif
 }
 
 static void unmap_notify(XEvent *ev) {

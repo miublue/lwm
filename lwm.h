@@ -48,6 +48,7 @@ void ws_go(const arg_t arg);
 static void configure_request(XEvent *ev);
 static void key_press(XEvent *ev);
 static void map_request(XEvent *ev);
+static void enter_notify(XEvent *ev);
 static void unmap_notify(XEvent *ev);
 static void destroy_notify(XEvent *ev);
 
