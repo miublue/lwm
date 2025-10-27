@@ -303,7 +303,7 @@ int main() {
         BORDER_SELECT, &border_select, &border_select);
 
     XSelectInput(display, root, SubstructureRedirectMask);
-    XDefineCursor(display, root, XCreateFontCursor(display, 68));
+    // XDefineCursor(display, root, XCreateFontCursor(display, 68));
     grab_input();
 
     for (int i = 0; i < 10; ++i) {
