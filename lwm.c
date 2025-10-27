@@ -224,6 +224,12 @@ static void win_focus(int w) {
 
 static void tile() {
     if (CURWS.size && WSWIN(CURWS.cur).is_full) return;
+    for (int i = 0; i < CURWS.size; ++i) {
+        if (WSWIN(i).wn == None) {
+            win_del(i);
+            i = 0; // make absolute sure that all empty clients are deleted
+        }
+    }
     switch (CURWS.mode) {
     case MODE_MONOCLE: return tile_monocle();
     case MODE_NSTACK: return tile_nstack();
