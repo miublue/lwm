@@ -3,15 +3,15 @@
 #include <X11/Xlib.h>
 
 #define BOTTOMBAR 0
-#define TOPGAP 18
+#define TOPGAP 20
 #define GAPSIZE 5
 #define MASTERW 0.5
 #define NMASTER 1
 #define DEFAULT_MODE MODE_NSTACK
 #define FOCUS_ON_HOVER 1
 #define BORDER_SIZE 2
-#define BORDER_NORMAL "#666666"
-#define BORDER_SELECT "#ff5599"
+#define BORDER_NORMAL "#000000"
+#define BORDER_SELECT "#ffffff"
 #define MOD Mod4Mask
 
 #define INIT_SCRIPT "$HOME/.lwmrc &"
