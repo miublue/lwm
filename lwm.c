@@ -15,7 +15,7 @@ static Window root;
 static unsigned int screen_w, screen_h;
 static workspace_t workspaces[10] = {0};
 static XColor border_normal, border_select;
-static int cur_ws = 0;
+static int cur_ws = 0, focus_on_hover = FOCUS_ON_HOVER;
 static const int topgap = BOTTOMBAR? 0 : TOPGAP;
 
 #define CURWS workspaces[cur_ws]
@@ -38,9 +38,12 @@ void exec(const arg_t arg) {
 }
 
 void tile_mode(const arg_t arg) {
+    int fh = focus_on_hover;
+    focus_on_hover = 0;
     if (CURWS.size) WSWIN(CURWS.cur).is_full = 0;
     CURWS.mode = arg.i;
     tile();
+    focus_on_hover = fh;
 }
 
 void incmaster(const arg_t arg) {
@@ -110,6 +113,9 @@ void win_to_ws(const arg_t arg) {
 
 void ws_go(const arg_t arg) {
     if (arg.i == cur_ws) return;
+    // ensure it won't focus random windows when switching workspaces
+    int fh = focus_on_hover;
+    focus_on_hover = 0;
     for (int i = 0; i < CURWS.size; ++i)
         XUnmapWindow(display, WSWIN(i).wn);
     cur_ws = arg.i;
@@ -117,6 +123,7 @@ void ws_go(const arg_t arg) {
         XMapWindow(display, WSWIN(i).wn);
     if (CURWS.size) win_focus(CURWS.cur);
     tile();
+    focus_on_hover = fh;
 }
 
 static void configure_request(XEvent *ev) {
@@ -154,11 +161,10 @@ static void map_request(XEvent *ev) {
 }
 
 static void enter_notify(XEvent *ev) {
-#if FOCUS_ON_HOVER
+    if (!focus_on_hover) return;
     while (XCheckTypedEvent(display, EnterNotify, ev));
     int c = client_from_window(ev->xcrossing.window);
     if (c != -1) win_focus(c);
-#endif
 }
 
 static void unmap_notify(XEvent *ev) {
@@ -171,7 +177,7 @@ static void destroy_notify(XEvent *ev) {
     win_del(w);
 }
 
-static void grab_input() {
+static void grab_input(void) {
     XUngrabKey(display, AnyKey, AnyModifier, root);
     KeyCode code;
 
@@ -222,7 +228,7 @@ static void win_focus(int w) {
     }
 }
 
-static void tile() {
+static void tile(void) {
     if (CURWS.size && WSWIN(CURWS.cur).is_full) return;
     for (int i = 0; i < CURWS.size; ++i) {
         if (WSWIN(i).wn == None) {
@@ -236,7 +242,7 @@ static void tile() {
     }
 }
 
-static void tile_monocle() {
+static void tile_monocle(void) {
     const int gapsz = (BORDER_SIZE+GAPSIZE)*2;
     for (int i = 0; i < CURWS.size; ++i) {
         XMoveResizeWindow(display, WSWIN(i).wn, GAPSIZE, topgap+GAPSIZE,
@@ -244,7 +250,7 @@ static void tile_monocle() {
     }
 }
 
-static void tile_nstack() {
+static void tile_nstack(void) {
     if (CURWS.size < 2)
         return tile_monocle();
 
@@ -286,7 +292,7 @@ static int client_from_window(Window wn) {
     return -1;
 }
 
-int main() {
+int main(void) {
     if (!(display = XOpenDisplay(0))) return 1;
     signal(SIGCHLD, SIG_IGN);
     XSetErrorHandler(xerror);
