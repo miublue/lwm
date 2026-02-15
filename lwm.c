@@ -127,6 +127,7 @@ void win_center(const arg_t arg) {
 
 void win_to_ws(const arg_t arg) {
     if (arg.i == cur_ws || CURWS.size == 0) return;
+    // XXX: maybe also copy the client's state? (like size, position, is_float...)
     int ws = cur_ws;
     Window wn = WSWIN(CURWS.cur).wn;
     XUnmapWindow(display, wn);
