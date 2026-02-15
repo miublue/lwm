@@ -1,9 +1,11 @@
 CC = tcc
 OUT = lwm
+LIBS = -lX11
 PREFIX = /usr/local
+CFLAGS = -Wall -Werror
 
 all:
-	${CC} -O2 -o ${OUT} *.c -lX11
+	${CC} -O2 -o ${OUT} *.c -I. ${CFLAGS} ${LIBS}
 
 install: all
 	mkdir -p ${PREFIX}/bin
