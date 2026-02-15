@@ -48,6 +48,7 @@ void tile_mode(const arg_t arg) {
     if (CURWS.mode != MODE_FLOAT) CURWS.prev_mode = CURWS.mode;
     CURWS.mode = arg.i;
     tile();
+    win_focus(CURWS.cur);
     focus_on_hover = FOCUS_ON_HOVER;
 }
 
@@ -66,22 +67,24 @@ void nmaster(const arg_t arg) {
 }
 
 void win_next(const arg_t arg) {
-    if (CURWS.size < 2) return;
-    if (WSWIN(CURWS.cur).is_full) return;
+    if (CURWS.size < 2 || (CURWS.size && WSWIN(CURWS.cur).is_full)) return;
+    focus_on_hover = 0;
     if (++CURWS.cur >= CURWS.size) CURWS.cur = 0;
     win_focus(CURWS.cur);
+    focus_on_hover = FOCUS_ON_HOVER;
 }
 
 void win_prev(const arg_t arg) {
-    if (CURWS.size < 2) return;
-    if (WSWIN(CURWS.cur).is_full) return;
+    if (CURWS.size < 2 || (CURWS.size && WSWIN(CURWS.cur).is_full)) return;
+    focus_on_hover = 0;
     if (--CURWS.cur < 0) CURWS.cur = CURWS.size-1;
     win_focus(CURWS.cur);
+    focus_on_hover = FOCUS_ON_HOVER;
 }
 
 void win_rotate(const arg_t arg) {
-    if (CURWS.size < 2) return;
-    if (WSWIN(CURWS.cur).is_full) return;
+    if (CURWS.size < 2 || (CURWS.size && WSWIN(CURWS.cur).is_full)) return;
+    focus_on_hover = 0;
     int idx = (CURWS.cur + arg.i);
     if (idx < 0) idx = (CURWS.size-1);
     if (idx >= CURWS.size) idx = 0;
@@ -90,6 +93,7 @@ void win_rotate(const arg_t arg) {
     CURWS.list[idx] = cur;
     win_focus(idx);
     tile();
+    focus_on_hover = FOCUS_ON_HOVER;
 }
 
 void win_kill(const arg_t arg) {
@@ -99,6 +103,7 @@ void win_kill(const arg_t arg) {
 
 void win_full(const arg_t arg) {
     if (CURWS.size == 0) return;
+    focus_on_hover = 0;
     if ((WSWIN(CURWS.cur).is_full = !WSWIN(CURWS.cur).is_full)) {
         XRaiseWindow(display, WSWIN(CURWS.cur).wn);
         XMoveResizeWindow(display, WSWIN(CURWS.cur).wn,
@@ -107,16 +112,18 @@ void win_full(const arg_t arg) {
         if (!WSWIN(CURWS.cur).is_float) XLowerWindow(display, WSWIN(CURWS.cur).wn);
         tile();
     }
+    focus_on_hover = FOCUS_ON_HOVER;
 }
 
 void win_float(const arg_t arg) {
-    if (CURWS.size == 0) return;
-    if (WSWIN(CURWS.cur).is_full) return;
+    if (CURWS.size == 0 || (CURWS.size && WSWIN(CURWS.cur).is_full)) return;
+    focus_on_hover = 0;
     if ((WSWIN(CURWS.cur).is_float = !WSWIN(CURWS.cur).is_float))
         XRaiseWindow(display, WSWIN(CURWS.cur).wn);
     else
         XLowerWindow(display, WSWIN(CURWS.cur).wn);
     tile();
+    focus_on_hover = FOCUS_ON_HOVER;
 }
 
 void win_center(const arg_t arg) {
@@ -130,19 +137,20 @@ void win_center(const arg_t arg) {
 
 void win_to_ws(const arg_t arg) {
     if (arg.i == cur_ws || CURWS.size == 0) return;
-    // XXX: maybe also copy the client's state? (like size, position, is_float...)
     int ws = cur_ws;
-    Window wn = WSWIN(CURWS.cur).wn;
-    XUnmapWindow(display, wn);
+    client_t c = WSWIN(CURWS.cur);
+    XUnmapWindow(display, c.wn);
     cur_ws = arg.i;
-    win_add(wn);
+    win_add(c.wn);
+    client_t *w = &WSWIN(CURWS.size-1);
+    w->is_float = c.is_float;
+    w->x = c.x; w->y = c.y; w->w = c.w; w->h = c.h;
     cur_ws = ws;
     win_del(CURWS.cur);
 }
 
 void ws_go(const arg_t arg) {
     if (arg.i == cur_ws) return;
-    // ensure it won't focus random windows when switching workspaces
     focus_on_hover = 0;
     for (int i = 0; i < CURWS.size; ++i) XUnmapWindow(display, WSWIN(i).wn);
     cur_ws = arg.i;
@@ -257,12 +265,15 @@ static void win_add(Window w) {
 
 static void win_del(int w) {
     if (w < 0 || CURWS.size == 0) return;
+    focus_on_hover = 0;
     CURWS.size--;
     for (int i = w; i < CURWS.size; ++i) CURWS.list[i] = CURWS.list[i+1];
     if (CURWS.size == 0) CURWS.cur = 0;
     else if (CURWS.cur >= CURWS.size) CURWS.cur = CURWS.size-1;
+    if (CURWS.prev >= CURWS.size) CURWS.prev = CURWS.cur;
     win_focus(CURWS.cur);
     tile();
+    focus_on_hover = FOCUS_ON_HOVER;
 }
 
 static void win_focus(int w) {
@@ -271,14 +282,18 @@ static void win_focus(int w) {
         CURWS.cur = 0;
         return;
     }
+    focus_on_hover = 0;
     if (WSWIN(w).is_float) XRaiseWindow(display, WSWIN(w).wn);
+    else if (!WSWIN(CURWS.cur).is_float) CURWS.prev = CURWS.cur;
     XSetInputFocus(display, WSWIN(w).wn, RevertToParent, CurrentTime);
     CURWS.cur = w;
     XSetWindowAttributes attr;
-    for (int i = 0; i < CURWS.size; ++i) {
+    for (int i = CURWS.size-1; i >= 0; --i) {
         attr.border_pixel = (i == CURWS.cur)? border_select.pixel : border_normal.pixel;
         XChangeWindowAttributes(display, WSWIN(i).wn, CWBorderPixel, &attr);
+        if (!WSWIN(i).is_float && i != CURWS.cur && i != CURWS.prev) XLowerWindow(display, WSWIN(i).wn);
     }
+    focus_on_hover = FOCUS_ON_HOVER;
 }
 
 static void tile(void) {
@@ -397,7 +412,7 @@ int main(void) {
 
     for (int i = 0; i < 10; ++i) {
         workspaces[i].alloc = NUM_CLIENTS;
-        workspaces[i].size = workspaces[i].cur = 0;
+        workspaces[i].size = workspaces[i].cur = workspaces[i].prev = 0;
         workspaces[i].list = calloc(NUM_CLIENTS, sizeof(client_t));
         workspaces[i].mode = workspaces[i].prev_mode = DEFAULT_MODE;
         workspaces[i].masterw = screen_w * MASTERW;

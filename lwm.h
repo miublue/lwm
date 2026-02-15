@@ -19,7 +19,7 @@ typedef struct {
 typedef struct {
     size_t alloc, size;
     client_t *list;
-    int cur, prev_mode, mode, masterw, nmaster;
+    int prev, cur, prev_mode, mode, masterw, nmaster;
 } workspace_t;
 
 typedef struct {
