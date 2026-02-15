@@ -176,16 +176,15 @@ static void map_request(XEvent *ev) {
 }
 
 static void unmap_notify(XEvent *ev) {
-    int w = client_from_window(ev->xunmap.window);
-    win_del(w);
+    win_del(client_from_window(ev->xdestroywindow.window));
 }
 
 static void destroy_notify(XEvent *ev) {
-    int w = client_from_window(ev->xdestroywindow.window);
-    win_del(w);
+    win_del(client_from_window(ev->xdestroywindow.window));
 }
 
 static void motion_notify(XEvent *ev) {
+    focus_on_hover = 0; // to avoid unnecessary weirdness
     int c = client_from_window(button_event.subwindow);
     if (c == -1) return;
     WSWIN(c).is_float = 1;
@@ -199,10 +198,11 @@ static void motion_notify(XEvent *ev) {
         MAX(50, hover_attr.height + (button_event.button==3 ? ydiff : 0)));
     set_client_size(c);
     tile();
+    focus_on_hover = FOCUS_ON_HOVER;
 }
 
 static void enter_notify(XEvent *ev) {
-    if (!focus_on_hover) return;
+    if (button_event.subwindow != None || !focus_on_hover) return;
     while (XCheckTypedEvent(display, EnterNotify, ev));
     win_focus(client_from_window(ev->xcrossing.window));
 }
