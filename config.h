@@ -44,19 +44,16 @@ static struct key_t keys[] = {
 
     {MOD,           XK_f,      win_full,   {0}},
     {MOD,           XK_q,      win_kill,   {0}},
+    {MOD,           XK_c,      win_center, {0}},
+    {MOD,           XK_space,  win_float,  {0}},
 
+    {MOD|ShiftMask, XK_f,      tile_mode,  {.i = MODE_FLOAT}},
     {MOD|ShiftMask, XK_t,      tile_mode,  {.i = MODE_NSTACK}},
     {MOD|ShiftMask, XK_m,      tile_mode,  {.i = MODE_MONOCLE}},
 
-    DESKTOPCHANGE(XK_1, 0),
-    DESKTOPCHANGE(XK_2, 1),
-    DESKTOPCHANGE(XK_3, 2),
-    DESKTOPCHANGE(XK_4, 3),
-    DESKTOPCHANGE(XK_5, 4),
-    DESKTOPCHANGE(XK_6, 5),
-    DESKTOPCHANGE(XK_7, 6),
-    DESKTOPCHANGE(XK_8, 7),
-    DESKTOPCHANGE(XK_9, 8),
+    DESKTOPCHANGE(XK_1, 0), DESKTOPCHANGE(XK_2, 1), DESKTOPCHANGE(XK_3, 2),
+    DESKTOPCHANGE(XK_4, 3), DESKTOPCHANGE(XK_5, 4), DESKTOPCHANGE(XK_6, 5),
+    DESKTOPCHANGE(XK_7, 6), DESKTOPCHANGE(XK_8, 7), DESKTOPCHANGE(XK_9, 8),
     DESKTOPCHANGE(XK_0, 9),
 };
 
