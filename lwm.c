@@ -99,11 +99,14 @@ void win_kill(const arg_t arg) {
 
 void win_full(const arg_t arg) {
     if (CURWS.size == 0) return;
-    if ((WSWIN(CURWS.cur).is_full = !WSWIN(CURWS.cur).is_full))
+    if ((WSWIN(CURWS.cur).is_full = !WSWIN(CURWS.cur).is_full)) {
+        XRaiseWindow(display, WSWIN(CURWS.cur).wn);
         XMoveResizeWindow(display, WSWIN(CURWS.cur).wn,
             -BORDER_SIZE, -BORDER_SIZE, screen_w, screen_h);
-    else
+    } else {
+        if (!WSWIN(CURWS.cur).is_float) XLowerWindow(display, WSWIN(CURWS.cur).wn);
         tile();
+    }
 }
 
 void win_float(const arg_t arg) {
@@ -186,9 +189,8 @@ static void destroy_notify(XEvent *ev) {
 }
 
 static void motion_notify(XEvent *ev) {
-    focus_on_hover = 0; // to avoid unnecessary weirdness
     int c = client_from_window(button_event.subwindow);
-    if (c == -1) return;
+    if (c == -1 || (c != -1 && WSWIN(c).is_full)) return;
     WSWIN(c).is_float = 1;
     XRaiseWindow(display, button_event.subwindow);
     const int xdiff = ev->xbutton.x_root - button_event.x_root;
@@ -200,7 +202,6 @@ static void motion_notify(XEvent *ev) {
         MAX(50, hover_attr.height + (button_event.button==3 ? ydiff : 0)));
     set_client_size(c);
     tile();
-    focus_on_hover = FOCUS_ON_HOVER;
 }
 
 static void enter_notify(XEvent *ev) {
