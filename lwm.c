@@ -45,6 +45,7 @@ void exec(const arg_t arg) {
 void tile_mode(const arg_t arg) {
     focus_on_hover = 0;
     if (CURWS.size) WSWIN(CURWS.cur).is_full = 0;
+    if (CURWS.mode != MODE_FLOAT) CURWS.prev_mode = CURWS.mode;
     CURWS.mode = arg.i;
     tile();
     focus_on_hover = FOCUS_ON_HOVER;
@@ -286,7 +287,7 @@ static void tile(void) {
             i = 0; // make absolute sure that all empty clients are deleted
         }
     }
-    switch (CURWS.mode) {
+    switch (CURWS.mode == MODE_FLOAT? CURWS.prev_mode : CURWS.mode) {
     case MODE_MONOCLE: tile_monocle(); break;
     case MODE_NSTACK: tile_nstack(); break;
     default: break;
@@ -396,7 +397,7 @@ int main(void) {
         workspaces[i].alloc = NUM_CLIENTS;
         workspaces[i].size = workspaces[i].cur = 0;
         workspaces[i].list = calloc(NUM_CLIENTS, sizeof(client_t));
-        workspaces[i].mode = DEFAULT_MODE;
+        workspaces[i].mode = workspaces[i].prev_mode = DEFAULT_MODE;
         workspaces[i].masterw = screen_w * MASTERW;
         workspaces[i].nmaster = NMASTER;
     }
