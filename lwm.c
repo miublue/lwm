@@ -409,10 +409,11 @@ int main(void) {
         BORDER_NORMAL, &border_normal, &border_normal);
     XAllocNamedColor(display, DefaultColormap(display, s),
         BORDER_SELECT, &border_select, &border_select);
+    border_normal.pixel |= 0xff << 24;
+    border_select.pixel |= 0xff << 24;
 
     XSelectInput(display, root, SubstructureRedirectMask);
     grab_input();
-
     for (int i = 0; i < 10; ++i) {
         workspaces[i].alloc = NUM_CLIENTS;
         workspaces[i].size = workspaces[i].cur = workspaces[i].prev = 0;
