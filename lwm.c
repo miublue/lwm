@@ -124,6 +124,7 @@ void win_float(const arg_t arg) {
     else
         XLowerWindow(display, WSWIN(CURWS.cur).wn);
     tile();
+    win_focus(CURWS.cur);
     focus_on_hover = FOCUS_ON_HOVER;
 }
 
