@@ -11,8 +11,11 @@
 lwm is a minimalistic window manager (~500LoC) with support for:
 - master-stack tiling, monocle and floating modes;
 - multiple master windows on tiling mode;
+- mixed floating/tiling modes;
 - fullscreen windows;
 - 10 workspaces;
+- configurable gaps around windows and border width;
+- configurable space for bar on top/bottom of the screen;
 
 ## Installation
 Compile with:
@@ -24,8 +27,8 @@ make install
 - Simply edit `config.h` and recompile.
 
 ## Known Issues
-- XRaiseWindow and XLowerWindow usage is rather chaotic.
-- Focusing between tiled and floating windows may raise or lower wrong window.
+- XRaiseWindow and XLowerWindow usage is somewhat chaotic.
+- Fullscreen raises tiled client over floating windows.
 - There are too many loops.
 - No support for ICCCM or EWMH.
 
