@@ -26,6 +26,7 @@ make install
 ## Known Issues
 - XRaiseWindow and XLowerWindow usage is rather chaotic.
 - Focusing between tiled and floating windows may raise or lower wrong window.
+- There are too many loops.
 - No support for ICCCM or EWMH.
 
 Pull requests are welcome.
