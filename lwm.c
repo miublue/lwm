@@ -7,6 +7,9 @@
 #include "lwm.h"
 #include "config.h"
 
+// XXX: i figured i could keep a second array with the indexes of all clients in
+//      rendering order, so `tile` would raise them in order based on the array.
+
 // client list can be resized anyhow
 #define NUM_CLIENTS 256
 
@@ -43,10 +46,10 @@ void exec(const arg_t arg) {
 }
 
 void tile_mode(const arg_t arg) {
-    focus_on_hover = 0;
-    if (CURWS.size) WSWIN(CURWS.cur).is_full = 0;
     if (CURWS.mode != MODE_FLOAT) CURWS.prev_mode = CURWS.mode;
     CURWS.mode = arg.i;
+    if (CURWS.size && WSWIN(CURWS.cur).is_full) return;
+    focus_on_hover = 0;
     tile();
     win_focus(CURWS.cur);
     focus_on_hover = FOCUS_ON_HOVER;
@@ -69,16 +72,14 @@ void nmaster(const arg_t arg) {
 void win_next(const arg_t arg) {
     if (CURWS.size < 2 || (CURWS.size && WSWIN(CURWS.cur).is_full)) return;
     focus_on_hover = 0;
-    if (++CURWS.cur >= CURWS.size) CURWS.cur = 0;
-    win_focus(CURWS.cur);
+    win_focus(CURWS.cur+1 >= CURWS.size? 0 : CURWS.cur+1);
     focus_on_hover = FOCUS_ON_HOVER;
 }
 
 void win_prev(const arg_t arg) {
     if (CURWS.size < 2 || (CURWS.size && WSWIN(CURWS.cur).is_full)) return;
     focus_on_hover = 0;
-    if (--CURWS.cur < 0) CURWS.cur = CURWS.size-1;
-    win_focus(CURWS.cur);
+    win_focus(CURWS.cur-1 < 0? CURWS.size-1 : CURWS.cur-1);
     focus_on_hover = FOCUS_ON_HOVER;
 }
 
@@ -286,12 +287,13 @@ static void win_focus(int w) {
     if (WSWIN(w).is_float) XRaiseWindow(display, WSWIN(w).wn);
     else if (!WSWIN(CURWS.cur).is_float) CURWS.prev = CURWS.cur;
     XSetInputFocus(display, WSWIN(w).wn, RevertToParent, CurrentTime);
+    XSetWindowBorder(display, WSWIN(CURWS.cur).wn, border_normal.pixel);
+    XSetWindowBorder(display, WSWIN(w).wn, border_select.pixel);
     CURWS.cur = w;
-    XSetWindowAttributes attr;
-    for (int i = CURWS.size-1; i >= 0; --i) {
-        attr.border_pixel = (i == CURWS.cur)? border_select.pixel : border_normal.pixel;
-        XChangeWindowAttributes(display, WSWIN(i).wn, CWBorderPixel, &attr);
-        if (!WSWIN(i).is_float && i != CURWS.cur && i != CURWS.prev) XLowerWindow(display, WSWIN(i).wn);
+    // XXX: i still don't like this.
+    for (int i = 0; i < CURWS.size; ++i) {
+        if (!WSWIN(i).is_float && i != CURWS.cur && i != CURWS.prev)
+            XLowerWindow(display, WSWIN(i).wn);
     }
     focus_on_hover = FOCUS_ON_HOVER;
 }
@@ -301,7 +303,7 @@ static void tile(void) {
     for (int i = 0; i < CURWS.size; ++i) {
         if (WSWIN(i).wn == None) {
             win_del(i);
-            i = 0; // make absolute sure that all empty clients are deleted
+            --i; // continue from previous window
         }
     }
     switch (CURWS.mode == MODE_FLOAT? CURWS.prev_mode : CURWS.mode) {
@@ -318,6 +320,8 @@ static void tile(void) {
 
 static void tile_monocle(void) {
     const int gapsz = (BORDER_SIZE+GAPSIZE)*2;
+    // XXX: gotta find a clever way to raise windows properly in monocle mode
+    //      whilst still keeping them underneath floating clients.
     for (int i = 0; i < CURWS.size; ++i) {
         if (WSWIN(i).is_float) continue;
         XMoveResizeWindow(display, WSWIN(i).wn, GAPSIZE, topgap+GAPSIZE,
@@ -326,7 +330,8 @@ static void tile_monocle(void) {
 }
 
 static void tile_nstack(void) {
-    const int gapsz = (BORDER_SIZE+GAPSIZE)*2;
+    const int gapdist = (BORDER_SIZE+GAPSIZE)*2;
+    const int stackgap = (BORDER_SIZE*2)+GAPSIZE;
     const int y_space = screen_h-TOPGAP-GAPSIZE;
     const int stack_w = screen_w-CURWS.masterw;
     int stack_h, master_h;
@@ -341,35 +346,33 @@ static void tile_nstack(void) {
 
     if (num_tiled < 2) return tile_monocle();
 
-    // if there are only master clients or if there is only stack
+    // if there are only master or stacked clients
     if (num_master >= num_tiled || num_master == 0 || first_stack == -1) {
         stack_h = y_space / num_tiled;
         for (int i = 0, cur = 0; i < CURWS.size && cur < num_tiled; ++i) {
             if (WSWIN(i).is_float) continue;
             XMoveResizeWindow(display, WSWIN(i).wn,
-                GAPSIZE, topgap+GAPSIZE + stack_h*cur,
-                screen_w-gapsz, stack_h-(BORDER_SIZE*2)-GAPSIZE);
+                GAPSIZE, (topgap+GAPSIZE) + (stack_h * cur),
+                screen_w - gapdist, stack_h - stackgap);
             ++cur; // cur is only incremented if client is not floating
         }
         return;
     }
 
-    const int num_stack = num_tiled - num_master;
     master_h = y_space / num_master;
-    stack_h = y_space / num_stack;
+    stack_h = y_space / (num_tiled - num_master);
 
-    for (int i = 0, cur = 0; i < CURWS.size && cur < num_master; ++i) {
+    for (int i = 0, cur = 0; i < CURWS.size && cur < num_tiled; ++i) {
         if (WSWIN(i).is_float) continue;
-        XMoveResizeWindow(display, WSWIN(i).wn,
-            GAPSIZE, (topgap+GAPSIZE) + (master_h*cur),
-            CURWS.masterw-(BORDER_SIZE*2)-GAPSIZE, master_h-(BORDER_SIZE*2)-GAPSIZE);
-        ++cur;
-    }
-    for (int i = first_stack, cur = 0; i < CURWS.size && cur < num_stack; ++i) {
-        if (WSWIN(i).is_float) continue;
-        XMoveResizeWindow(display, WSWIN(i).wn,
-            CURWS.masterw+GAPSIZE, (topgap+GAPSIZE) + (stack_h*cur),
-            stack_w-gapsz, stack_h-(BORDER_SIZE*2)-GAPSIZE);
+        if (cur < num_master) {
+            XMoveResizeWindow(display, WSWIN(i).wn,
+                GAPSIZE, (topgap+GAPSIZE) + (master_h * cur),
+                CURWS.masterw - stackgap, master_h - stackgap);
+        } else {
+            XMoveResizeWindow(display, WSWIN(i).wn,
+                CURWS.masterw+GAPSIZE, (topgap+GAPSIZE) + (stack_h * (cur-num_master)),
+                stack_w - gapdist, stack_h - stackgap);
+        }
         ++cur;
     }
 }
