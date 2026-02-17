@@ -33,6 +33,32 @@ static void (*events[LASTEvent])(XEvent *ev) = {
     [ButtonRelease]    = button_release,
 };
 
+static void retile(void) {
+    if (CURWS.size && WSWIN(CURWS.cur).is_full) return;
+    XEvent ev;
+    XWindowChanges wc;
+    wc.stack_mode = Below;
+    wc.sibling = WSWIN(CURWS.cur).wn;
+    for (int i = 0; i < CURWS.size; ++i) {
+        // delete empty windows and continue from previous iteration
+        if (WSWIN(i).wn == None) {
+            win_del(i--);
+            continue;
+        }
+        if (!WSWIN(i).is_float) {
+            if (CURWS.cur == i) continue;
+            XConfigureWindow(display, WSWIN(i).wn, CWSibling|CWStackMode, &wc);
+            wc.sibling = WSWIN(CURWS.cur).wn;
+        } else {
+            XMoveResizeWindow(display, WSWIN(i).wn, WSWIN(i).x, WSWIN(i).y, WSWIN(i).w, WSWIN(i).h);
+        }
+    }
+    if (WSWIN(CURWS.cur).is_float) XRaiseWindow(display, WSWIN(CURWS.cur).wn);
+    tile();
+    XSync(display, False);
+    while (XCheckTypedEvent(display, EnterNotify, &ev));
+}
+
 void exec(const arg_t arg) {
     if (fork() != 0) return;
     if (display) close(ConnectionNumber(display));
@@ -44,10 +70,8 @@ void tile_mode(const arg_t arg) {
     if (CURWS.mode != MODE_FLOAT) CURWS.prev_mode = CURWS.mode;
     CURWS.mode = arg.i;
     if (CURWS.size && WSWIN(CURWS.cur).is_full) return;
-    focus_on_hover = 0;
-    tile();
     win_focus(CURWS.cur);
-    focus_on_hover = FOCUS_ON_HOVER;
+    retile();
 }
 
 void incmaster(const arg_t arg) {
@@ -55,32 +79,29 @@ void incmaster(const arg_t arg) {
     if (CURWS.masterw > screen_w-100 && arg.i > 0) return;
     if (WSWIN(CURWS.cur).is_full) return;
     CURWS.masterw += arg.i;
-    tile();
+    retile();
 }
 
 void nmaster(const arg_t arg) {
     CURWS.nmaster += arg.i;
     if (CURWS.nmaster < 0) CURWS.nmaster = 0;
-    tile();
+    retile();
 }
 
 void win_next(const arg_t arg) {
     if (CURWS.size < 2 || (CURWS.size && WSWIN(CURWS.cur).is_full)) return;
-    focus_on_hover = 0;
     win_focus(CURWS.cur+1 >= CURWS.size? 0 : CURWS.cur+1);
-    focus_on_hover = FOCUS_ON_HOVER;
+    retile();
 }
 
 void win_prev(const arg_t arg) {
     if (CURWS.size < 2 || (CURWS.size && WSWIN(CURWS.cur).is_full)) return;
-    focus_on_hover = 0;
     win_focus(CURWS.cur-1 < 0? CURWS.size-1 : CURWS.cur-1);
-    focus_on_hover = FOCUS_ON_HOVER;
+    retile();
 }
 
 void win_rotate(const arg_t arg) {
     if (CURWS.size < 2 || (CURWS.size && WSWIN(CURWS.cur).is_full)) return;
-    focus_on_hover = 0;
     int idx = (CURWS.cur + arg.i);
     if (idx < 0) idx = (CURWS.size-1);
     if (idx >= CURWS.size) idx = 0;
@@ -88,8 +109,7 @@ void win_rotate(const arg_t arg) {
     CURWS.list[CURWS.cur] = CURWS.list[idx];
     CURWS.list[idx] = cur;
     win_focus(idx);
-    tile();
-    focus_on_hover = FOCUS_ON_HOVER;
+    retile();
 }
 
 void win_kill(const arg_t arg) {
@@ -99,22 +119,19 @@ void win_kill(const arg_t arg) {
 
 void win_full(const arg_t arg) {
     if (CURWS.size == 0) return;
-    focus_on_hover = 0;
     if ((WSWIN(CURWS.cur).is_full = !WSWIN(CURWS.cur).is_full)) {
         XRaiseWindow(display, WSWIN(CURWS.cur).wn);
         XMoveResizeWindow(display, WSWIN(CURWS.cur).wn,
             -BORDER_SIZE, -BORDER_SIZE, screen_w, screen_h);
-    } else tile();
-    focus_on_hover = FOCUS_ON_HOVER;
+    }
+    retile();
 }
 
 void win_float(const arg_t arg) {
     if (CURWS.size == 0 || (CURWS.size && WSWIN(CURWS.cur).is_full)) return;
-    focus_on_hover = 0;
     WSWIN(CURWS.cur).is_float = !WSWIN(CURWS.cur).is_float;
-    tile();
     win_focus(CURWS.cur);
-    focus_on_hover = FOCUS_ON_HOVER;
+    retile();
 }
 
 void win_center(const arg_t arg) {
@@ -123,7 +140,7 @@ void win_center(const arg_t arg) {
     c->x = (screen_w/2) - (c->w/2);
     c->y = (screen_h/2) - (c->h/2);
     if (c->is_full || !c->is_float) return;
-    tile();
+    retile();
 }
 
 void win_to_ws(const arg_t arg) {
@@ -138,17 +155,16 @@ void win_to_ws(const arg_t arg) {
     w->x = c.x; w->y = c.y; w->w = c.w; w->h = c.h;
     cur_ws = ws;
     win_del(CURWS.cur);
+    retile();
 }
 
 void ws_go(const arg_t arg) {
     if (arg.i == cur_ws) return;
-    focus_on_hover = 0;
     for (int i = 0; i < CURWS.size; ++i) XUnmapWindow(display, WSWIN(i).wn);
     cur_ws = arg.i;
     for (int i = 0; i < CURWS.size; ++i) XMapWindow(display, WSWIN(i).wn);
     if (CURWS.size) win_focus(CURWS.cur);
-    tile();
-    focus_on_hover = FOCUS_ON_HOVER;
+    retile();
 }
 
 static void configure_request(XEvent *ev) {
@@ -161,7 +177,7 @@ static void configure_request(XEvent *ev) {
         .sibling = cr->above,
         .stack_mode = cr->detail,
     });
-    tile();
+    retile();
 }
 
 static void map_request(XEvent *ev) {
@@ -173,26 +189,24 @@ static void map_request(XEvent *ev) {
     XSetWindowBorderWidth(display, wn, BORDER_SIZE);
     XSetWindowBorder(display, wn, border_normal.pixel);
     XMapWindow(display, wn);
-    XLowerWindow(display, wn);
     win_focus(CURWS.size-1);
-    set_client_size(CURWS.cur);
-    win_center((const arg_t){0});
-    tile();
+    retile();
 }
 
 static void unmap_notify(XEvent *ev) {
     win_del(client_from_window(ev->xdestroywindow.window));
+    retile();
 }
 
 static void destroy_notify(XEvent *ev) {
     win_del(client_from_window(ev->xdestroywindow.window));
+    retile();
 }
 
 static void motion_notify(XEvent *ev) {
     int c = client_from_window(button_event.subwindow);
     if (c == -1 || (c != -1 && WSWIN(c).is_full)) return;
     WSWIN(c).is_float = 1;
-    XRaiseWindow(display, button_event.subwindow);
     const int xdiff = ev->xbutton.x_root - button_event.x_root;
     const int ydiff = ev->xbutton.y_root - button_event.y_root;
     XMoveResizeWindow(display, button_event.subwindow,
@@ -201,7 +215,7 @@ static void motion_notify(XEvent *ev) {
         MAX(50, hover_attr.width  + (button_event.button==3 ? xdiff : 0)),
         MAX(50, hover_attr.height + (button_event.button==3 ? ydiff : 0)));
     set_client_size(c);
-    tile();
+    retile();
 }
 
 static void enter_notify(XEvent *ev) {
@@ -253,18 +267,17 @@ static void win_add(Window w) {
         .is_float = (CURWS.mode == MODE_FLOAT),
     };
     CURWS.list[CURWS.size++] = client;
+    set_client_size(CURWS.size-1);
+    win_center((const arg_t){0});
 }
 
 static void win_del(int w) {
     if (w < 0 || CURWS.size == 0) return;
-    focus_on_hover = 0;
     CURWS.size--;
     for (int i = w; i < CURWS.size; ++i) CURWS.list[i] = CURWS.list[i+1];
     if (CURWS.size == 0) CURWS.cur = 0;
     else if (CURWS.cur >= CURWS.size) CURWS.cur = CURWS.size-1;
     win_focus(CURWS.cur);
-    tile();
-    focus_on_hover = FOCUS_ON_HOVER;
 }
 
 static void win_focus(int w) {
@@ -273,41 +286,21 @@ static void win_focus(int w) {
         CURWS.cur = 0;
         return;
     }
-    focus_on_hover = 0;
-    if (w != CURWS.cur) {
-        for (int i = 0; i < CURWS.size; ++i) {
-            const int is_next_float = (WSWIN(w).is_float);
-            const int is_not_float = (i != w && !WSWIN(i).is_float);
-            const int is_current_float = (i == CURWS.cur && is_next_float);
-            if (is_not_float && !is_next_float && !is_current_float)
-                XLowerWindow(display, WSWIN(i).wn);
-        }
-    }
+    if (WSWIN(w).is_float) XRaiseWindow(display, WSWIN(w).wn);
     XSetInputFocus(display, WSWIN(w).wn, RevertToParent, CurrentTime);
     XSetWindowBorder(display, WSWIN(CURWS.cur).wn, border_normal.pixel);
     XSetWindowBorder(display, WSWIN(w).wn, border_select.pixel);
     CURWS.cur = w;
-    tile();
-    focus_on_hover = FOCUS_ON_HOVER;
+    retile();
 }
 
 static void tile(void) {
     if ((CURWS.size == 0) || (CURWS.size && WSWIN(CURWS.cur).is_full)) return;
-    for (int i = 0; i < CURWS.size; ++i) {
-        // delete empty windows and continue from previous iteration
-        if (WSWIN(i).wn == None) {
-            win_del(i--);
-            continue;
-        }
-        if (WSWIN(i).is_float)
-            XMoveResizeWindow(display, WSWIN(i).wn, WSWIN(i).x, WSWIN(i).y, WSWIN(i).w, WSWIN(i).h);
-    }
     switch (CURWS.mode == MODE_FLOAT? CURWS.prev_mode : CURWS.mode) {
     case MODE_MONOCLE: tile_monocle(); break;
     case MODE_NSTACK: tile_nstack(); break;
     default: break;
     }
-    if (WSWIN(CURWS.cur).is_float) XRaiseWindow(display, WSWIN(CURWS.cur).wn);
 }
 
 static void tile_monocle(void) {
@@ -333,9 +326,7 @@ static void tile_nstack(void) {
         if (num_master < CURWS.nmaster) ++num_master;
         else if (first_stack == -1) first_stack = i;
     }
-
     if (num_tiled < 2) return tile_monocle();
-
     // if there are only master or stacked clients
     if (num_master >= num_tiled || num_master == 0 || first_stack == -1) {
         stack_h = y_space / num_tiled;
@@ -351,7 +342,6 @@ static void tile_nstack(void) {
 
     master_h = y_space / num_master;
     stack_h = y_space / (num_tiled - num_master);
-
     for (int i = 0, cur = 0; i < CURWS.size && cur < num_tiled; ++i) {
         if (WSWIN(i).is_float) continue;
         if (cur < num_master)
