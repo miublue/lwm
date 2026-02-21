@@ -264,7 +264,8 @@ static void win_del(int w) {
     if (w < 0 || CURWS.size == 0) return;
     CURWS.size--;
     for (int i = w; i < CURWS.size; ++i) CURWS.list[i] = CURWS.list[i+1];
-    win_focus(MIN(CURWS.cur, CURWS.size-1));
+    if (CURWS.prev < CURWS.size) win_focus(CURWS.prev);
+    else win_focus(MIN(CURWS.cur, CURWS.size-1));
 }
 
 static void win_focus(int w) {
