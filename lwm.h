@@ -21,7 +21,7 @@ typedef struct {
 } client_t;
 
 typedef struct {
-    unsigned char cur, mode, prev_mode, size;
+    unsigned char prev, cur, mode, prev_mode, size;
     int masterw, nmaster;
     client_t list[MAX_WINDOWS];
 } workspace_t;
