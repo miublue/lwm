@@ -15,7 +15,7 @@ static workspace_t workspaces[10] = {0};
 static XColor border_normal, border_select;
 static XButtonEvent button_event;
 static XWindowAttributes hover_attr;
-static int cur_ws = 0, focus_on_hover = FOCUS_ON_HOVER;
+static int cur_ws = 0;
 static const int topgap = BOTTOMBAR? 0 : TOPGAP;
 
 #define CURWS workspaces[cur_ws]
@@ -27,7 +27,9 @@ static void (*events[LASTEvent])(XEvent *ev) = {
     [UnmapNotify]      = unmap_notify,
     [DestroyNotify]    = destroy_notify,
     [MotionNotify]     = motion_notify,
+#if FOCUS_ON_HOVER
     [EnterNotify]      = enter_notify,
+#endif
     [KeyPress]         = key_press,
     [ButtonPress]      = button_press,
     [ButtonRelease]    = button_release,
@@ -208,11 +210,13 @@ static void motion_notify(XEvent *ev) {
     retile();
 }
 
+#if FOCUS_ON_HOVER
 static void enter_notify(XEvent *ev) {
-    if (button_event.subwindow != None || !focus_on_hover) return;
+    if (button_event.subwindow != None) return;
     while (XCheckTypedEvent(display, EnterNotify, ev));
     win_focus(client_from_window(ev->xcrossing.window));
 }
+#endif
 
 static void key_press(XEvent *ev) {
     KeySym keysym = XkbKeycodeToKeysym(display, ev->xkey.keycode, 0, 0);
