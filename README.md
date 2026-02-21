@@ -28,8 +28,7 @@ make install
 
 ## Known Issues
 - XRaiseWindow and XLowerWindow usage is somewhat chaotic.
-- Fullscreen raises tiled client over floating windows.
-- There are too many loops.
+- There are a few too many loops.
 - No support for ICCCM or EWMH.
 
 Pull requests are welcome.
