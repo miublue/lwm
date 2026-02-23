@@ -66,6 +66,7 @@ static void grab_input(void);
 static void win_add(Window w);
 static void win_del(int w);
 static void win_focus(int w);
+static void retile(void);
 static void tile(void);
 static void tile_monocle(void);
 static void tile_nstack(void);

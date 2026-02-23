@@ -35,24 +35,6 @@ static void (*events[LASTEvent])(XEvent *ev) = {
     [ButtonRelease]    = button_release,
 };
 
-static void retile(void) {
-    if (CURWS.size && WSWIN(CURWS.cur).is_full) return;
-    XEvent ev;
-    if (CURWS.prev < CURWS.size && !WSWIN(CURWS.prev).is_float) XLowerWindow(display, WSWIN(CURWS.prev).wn);
-    for (int i = CURWS.size-1; i >= 0; --i) {
-        if (WSWIN(i).wn == None) {
-            win_del(i);
-            continue;
-        }
-        if (WSWIN(i).is_float)
-            XMoveResizeWindow(display, WSWIN(i).wn, WSWIN(i).x, WSWIN(i).y, WSWIN(i).w, WSWIN(i).h);
-        else if (i != CURWS.prev && i != CURWS.cur) XLowerWindow(display, WSWIN(i).wn);
-    }
-    tile();
-    XSync(display, False);
-    while (XCheckTypedEvent(display, EnterNotify, &ev));
-}
-
 void exec(const arg_t arg) {
     if (fork() != 0) return;
     if (display) close(ConnectionNumber(display));
@@ -268,8 +250,7 @@ static void win_del(int w) {
     if (w < 0 || CURWS.size == 0) return;
     CURWS.size--;
     for (int i = w; i < CURWS.size; ++i) CURWS.list[i] = CURWS.list[i+1];
-    if (CURWS.prev < CURWS.size) win_focus(CURWS.prev);
-    else win_focus(MIN(CURWS.cur, CURWS.size-1));
+    win_focus(MIN(CURWS.cur, CURWS.size-1));
 }
 
 static void win_focus(int w) {
@@ -285,6 +266,24 @@ static void win_focus(int w) {
     XSetWindowBorder(display, WSWIN(w).wn, border_select.pixel);
     CURWS.cur = w;
     retile();
+}
+
+static void retile(void) {
+    if (CURWS.size && WSWIN(CURWS.cur).is_full) return;
+    XEvent ev;
+    if (CURWS.prev < CURWS.size && !WSWIN(CURWS.prev).is_float) XLowerWindow(display, WSWIN(CURWS.prev).wn);
+    for (int i = CURWS.size-1; i >= 0; --i) {
+        if (WSWIN(i).wn == None) {
+            win_del(i);
+            continue;
+        }
+        if (WSWIN(i).is_float)
+            XMoveResizeWindow(display, WSWIN(i).wn, WSWIN(i).x, WSWIN(i).y, WSWIN(i).w, WSWIN(i).h);
+        else if (i != CURWS.prev && i != CURWS.cur) XLowerWindow(display, WSWIN(i).wn);
+    }
+    tile();
+    XSync(display, False);
+    while (XCheckTypedEvent(display, EnterNotify, &ev));
 }
 
 static void tile(void) {
