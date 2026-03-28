@@ -94,8 +94,7 @@ void win_full(const union arg arg) {
     if (CURWS.size == 0) return;
     if ((WSWIN(CURWS.cur).is_full = !WSWIN(CURWS.cur).is_full)) {
         XRaiseWindow(display, WSWIN(CURWS.cur).wn);
-        XMoveResizeWindow(display, WSWIN(CURWS.cur).wn,
-            -BORDER_SIZE, -BORDER_SIZE, screen_w, screen_h);
+        XMoveResizeWindow(display, WSWIN(CURWS.cur).wn, -BORDER_SIZE, -BORDER_SIZE, screen_w, screen_h);
     } else XLowerWindow(display, WSWIN(CURWS.cur).wn);
     retile();
 }
@@ -124,8 +123,7 @@ void win_to_ws(const union arg arg) {
     cur_ws = arg.i;
     win_add(c.wn);
     struct client *w = &WSWIN(CURWS.size-1);
-    w->is_float = c.is_float;
-    w->x = c.x; w->y = c.y; w->w = c.w; w->h = c.h;
+    w->is_float = c.is_float, w->x = c.x, w->y = c.y, w->w = c.w, w->h = c.h;
     cur_ws = ws;
     win_del(CURWS.cur);
     retile();
@@ -168,7 +166,7 @@ static void map_request(XEvent *ev) {
 }
 
 static void unmap_notify(XEvent *ev) {
-    win_del(client_from_window(ev->xdestroywindow.window));
+    win_del(client_from_window(ev->xunmap.window));
     retile();
 }
 
@@ -179,7 +177,7 @@ static void destroy_notify(XEvent *ev) {
 
 static void motion_notify(XEvent *ev) {
     int c = client_from_window(button_event.subwindow);
-    if (c == -1 || (c != -1 && WSWIN(c).is_full)) return;
+    if (c == -1 || WSWIN(c).is_full) return;
     WSWIN(c).is_float = 1;
     const int xdiff = ev->xbutton.x_root - button_event.x_root;
     const int ydiff = ev->xbutton.y_root - button_event.y_root;
@@ -245,11 +243,7 @@ static void win_add(Window w) {
     if (w == None) return;
     if (CURWS.size) WSWIN(CURWS.cur).is_full = 0;
     assert(CURWS.size < MAX_WINDOWS);
-    struct client client = {
-        .wn = w,
-        .is_full = 0,
-        .is_float = (CURWS.mode == MODE_FLOAT),
-    };
+    struct client client = { .wn = w, .is_full = 0, .is_float = (CURWS.mode == MODE_FLOAT) };
     CURWS.list[CURWS.size++] = client;
     set_client_size(CURWS.size-1);
 }
@@ -295,7 +289,7 @@ static void retile(void) {
 }
 
 static void tile(void) {
-    if ((CURWS.size == 0) || (CURWS.size && WSWIN(CURWS.cur).is_full)) return;
+    if (CURWS.size == 0 || WSWIN(CURWS.cur).is_full) return;
     switch (CURWS.mode == MODE_FLOAT? CURWS.prev_mode : CURWS.mode) {
     case MODE_MONOCLE: tile_monocle(); break;
     case MODE_NSTACK: tile_nstack(); break;
@@ -367,10 +361,7 @@ static void set_client_size(int w) {
     struct client *c = &WSWIN(w);
     XWindowAttributes attr;
     XGetWindowAttributes(display, c->wn, &attr);
-    c->x = attr.x;
-    c->y = attr.y;
-    c->w = attr.width;
-    c->h = attr.height;
+    c->x = attr.x, c->y = attr.y, c->w = attr.width, c->h = attr.height;
 }
 
 int main(void) {
@@ -384,12 +375,9 @@ int main(void) {
     screen_w = XDisplayWidth(display, s);
     screen_h = XDisplayHeight(display, s);
 
-    XAllocNamedColor(display, DefaultColormap(display, s),
-        BORDER_NORMAL, &border_normal, &border_normal);
-    XAllocNamedColor(display, DefaultColormap(display, s),
-        BORDER_SELECT, &border_select, &border_select);
-    border_normal.pixel |= 0xff << 24;
-    border_select.pixel |= 0xff << 24;
+    XAllocNamedColor(display, DefaultColormap(display, s), BORDER_NORMAL, &border_normal, &border_normal);
+    XAllocNamedColor(display, DefaultColormap(display, s), BORDER_SELECT, &border_select, &border_select);
+    border_normal.pixel |= 0xff << 24, border_select.pixel |= 0xff << 24;
 
     XSelectInput(display, root, SubstructureRedirectMask);
     grab_input();
@@ -406,7 +394,6 @@ int main(void) {
         if (events[ev.type]) events[ev.type](&ev);
     }
 
-    for (int i = 0; i < 10; ++i) free(workspaces[i].list);
     XCloseDisplay(display);
     return 0;
 }

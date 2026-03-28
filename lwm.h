@@ -9,8 +9,7 @@
 #define MIN(a, b) ((a) < (b)? (a) : (b))
 #define MAX(a, b) ((a) > (b)? (a) : (b))
 #define LEN(x) (sizeof(x) / sizeof((x)[0]))
-#define mod_clean(mask) (mask & \
-        (ShiftMask|ControlMask|Mod1Mask|Mod2Mask|Mod3Mask|Mod4Mask|Mod5Mask))
+#define mod_clean(mask) (mask & (ShiftMask|ControlMask|Mod1Mask|Mod2Mask|Mod3Mask|Mod4Mask|Mod5Mask))
 
 enum { MODE_MONOCLE, MODE_NSTACK, MODE_FLOAT };
 
