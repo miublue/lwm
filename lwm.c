@@ -11,7 +11,7 @@
 static Display *display;
 static Window root;
 static int screen_w, screen_h;
-static workspace_t workspaces[10] = {0};
+static struct workspace workspaces[10] = {0};
 static XColor border_normal, border_select;
 static XButtonEvent button_event;
 static XWindowAttributes hover_attr;
@@ -35,21 +35,21 @@ static void (*events[LASTEvent])(XEvent *ev) = {
     [ButtonRelease]    = button_release,
 };
 
-void exec(const arg_t arg) {
+void exec(const union arg arg) {
     if (fork() != 0) return;
     if (display) close(ConnectionNumber(display));
     setsid();
     execvp((char*)arg.com[0], (char**)arg.com);
 }
 
-void tile_mode(const arg_t arg) {
+void tile_mode(const union arg arg) {
     if (CURWS.mode != MODE_FLOAT) CURWS.prev_mode = CURWS.mode;
     CURWS.mode = arg.i;
     if (CURWS.size && WSWIN(CURWS.cur).is_full) return;
     win_focus(CURWS.cur);
 }
 
-void incmaster(const arg_t arg) {
+void incmaster(const union arg arg) {
     if (CURWS.masterw < 100 && arg.i < 0) return;
     if (CURWS.masterw > screen_w-100 && arg.i > 0) return;
     if (WSWIN(CURWS.cur).is_full) return;
@@ -57,40 +57,40 @@ void incmaster(const arg_t arg) {
     retile();
 }
 
-void nmaster(const arg_t arg) {
+void nmaster(const union arg arg) {
     CURWS.nmaster += arg.i;
     if (CURWS.nmaster < 0) CURWS.nmaster = 0;
     retile();
 }
 
-void win_next(const arg_t arg) {
+void win_next(const union arg arg) {
     if (CURWS.size < 2 || (CURWS.size && WSWIN(CURWS.cur).is_full)) return;
     win_focus(CURWS.cur+1 >= CURWS.size? 0 : CURWS.cur+1);
 }
 
-void win_prev(const arg_t arg) {
+void win_prev(const union arg arg) {
     if (CURWS.size < 2 || (CURWS.size && WSWIN(CURWS.cur).is_full)) return;
     win_focus(CURWS.cur-1 < 0? CURWS.size-1 : CURWS.cur-1);
 }
 
-void win_rotate(const arg_t arg) {
+void win_rotate(const union arg arg) {
     if (CURWS.size < 2 || (CURWS.size && WSWIN(CURWS.cur).is_full)) return;
     int idx = (CURWS.cur + arg.i);
     if (idx < 0) idx = (CURWS.size-1);
     if (idx >= CURWS.size) idx = 0;
-    client_t cur = CURWS.list[CURWS.cur];
+    struct client cur = CURWS.list[CURWS.cur];
     CURWS.list[CURWS.cur] = CURWS.list[idx];
     CURWS.list[idx] = cur;
     win_focus(idx);
 }
 
-void win_kill(const arg_t arg) {
+void win_kill(const union arg arg) {
     if (CURWS.size == 0) return;
     // XXX: properly close window lmfao
     XKillClient(display, WSWIN(CURWS.cur).wn);
 }
 
-void win_full(const arg_t arg) {
+void win_full(const union arg arg) {
     if (CURWS.size == 0) return;
     if ((WSWIN(CURWS.cur).is_full = !WSWIN(CURWS.cur).is_full)) {
         XRaiseWindow(display, WSWIN(CURWS.cur).wn);
@@ -100,30 +100,30 @@ void win_full(const arg_t arg) {
     retile();
 }
 
-void win_float(const arg_t arg) {
+void win_float(const union arg arg) {
     if (CURWS.size == 0 || (CURWS.size && WSWIN(CURWS.cur).is_full)) return;
     WSWIN(CURWS.cur).is_float = !WSWIN(CURWS.cur).is_float;
     XLowerWindow(display, WSWIN(CURWS.cur).wn);
     win_focus(CURWS.cur);
 }
 
-void win_center(const arg_t arg) {
+void win_center(const union arg arg) {
     if (CURWS.size == 0) return;
-    client_t *c = &WSWIN(CURWS.cur);
+    struct client *c = &WSWIN(CURWS.cur);
     c->x = (screen_w/2) - (c->w/2);
     c->y = (screen_h/2) - (c->h/2);
     if (c->is_full || !c->is_float) return;
     retile();
 }
 
-void win_to_ws(const arg_t arg) {
+void win_to_ws(const union arg arg) {
     if (arg.i == cur_ws || CURWS.size == 0) return;
     int ws = cur_ws;
-    client_t c = WSWIN(CURWS.cur);
+    struct client c = WSWIN(CURWS.cur);
     XUnmapWindow(display, c.wn);
     cur_ws = arg.i;
     win_add(c.wn);
-    client_t *w = &WSWIN(CURWS.size-1);
+    struct client *w = &WSWIN(CURWS.size-1);
     w->is_float = c.is_float;
     w->x = c.x; w->y = c.y; w->w = c.w; w->h = c.h;
     cur_ws = ws;
@@ -131,7 +131,7 @@ void win_to_ws(const arg_t arg) {
     retile();
 }
 
-void ws_go(const arg_t arg) {
+void ws_go(const union arg arg) {
     if (arg.i == cur_ws) return;
     for (int i = 0; i < CURWS.size; ++i) XUnmapWindow(display, WSWIN(i).wn);
     cur_ws = arg.i;
@@ -164,7 +164,7 @@ static void map_request(XEvent *ev) {
     XMapWindow(display, wn);
     XLowerWindow(display, wn);
     win_focus(CURWS.size-1);
-    win_center((const arg_t){0});
+    win_center((const union arg){0});
 }
 
 static void unmap_notify(XEvent *ev) {
@@ -245,7 +245,7 @@ static void win_add(Window w) {
     if (w == None) return;
     if (CURWS.size) WSWIN(CURWS.cur).is_full = 0;
     assert(CURWS.size < MAX_WINDOWS);
-    client_t client = {
+    struct client client = {
         .wn = w,
         .is_full = 0,
         .is_float = (CURWS.mode == MODE_FLOAT),
@@ -364,7 +364,7 @@ static int client_from_window(Window wn) {
 
 static void set_client_size(int w) {
     if (w < 0 || CURWS.size == 0 || w >= CURWS.size) return;
-    client_t *c = &WSWIN(w);
+    struct client *c = &WSWIN(w);
     XWindowAttributes attr;
     XGetWindowAttributes(display, c->wn, &attr);
     c->x = attr.x;

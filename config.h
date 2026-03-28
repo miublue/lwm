@@ -23,7 +23,7 @@ const char *menu[] = { "dmenu_run", 0 };
     {MOD, key, ws_go, {.i = ws}}, \
     {MOD|ShiftMask, key, win_to_ws, {.i = ws}}
 
-static struct key_t keys[] = {
+static struct key keys[] = {
     {MOD,           XK_Return, exec,       {.com = term}},
     {MOD,           XK_d,      exec,       {.com = menu}},
 

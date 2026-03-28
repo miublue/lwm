@@ -14,43 +14,43 @@
 
 enum { MODE_MONOCLE, MODE_NSTACK, MODE_FLOAT };
 
-typedef struct {
+struct client {
     Window wn;
     int is_full, is_float;
     int x, y, w, h;
-} client_t;
-
-typedef struct {
-    unsigned char prev, cur, mode, prev_mode, size;
-    int masterw, nmaster;
-    client_t list[MAX_WINDOWS];
-} workspace_t;
-
-typedef struct {
-    const char **com;
-    const int i;
-} arg_t;
-
-struct key_t {
-    unsigned int mod;
-    KeySym keysym;
-    void (*fun)(const arg_t arg);
-    const arg_t arg;
 };
 
-void exec(const arg_t arg);
-void tile_mode(const arg_t arg);
-void incmaster(const arg_t arg);
-void nmaster(const arg_t arg);
-void win_next(const arg_t arg);
-void win_prev(const arg_t arg);
-void win_rotate(const arg_t arg);
-void win_kill(const arg_t arg);
-void win_full(const arg_t arg);
-void win_float(const arg_t arg);
-void win_center(const arg_t arg);
-void win_to_ws(const arg_t arg);
-void ws_go(const arg_t arg);
+struct workspace {
+    unsigned char prev, cur, mode, prev_mode, size;
+    int masterw, nmaster;
+    struct client list[MAX_WINDOWS];
+};
+
+union arg {
+    const char **com;
+    const int i;
+};
+
+struct key {
+    unsigned int mod;
+    KeySym keysym;
+    void (*fun)(const union arg arg);
+    const union arg arg;
+};
+
+void exec(const union arg arg);
+void tile_mode(const union arg arg);
+void incmaster(const union arg arg);
+void nmaster(const union arg arg);
+void win_next(const union arg arg);
+void win_prev(const union arg arg);
+void win_rotate(const union arg arg);
+void win_kill(const union arg arg);
+void win_full(const union arg arg);
+void win_float(const union arg arg);
+void win_center(const union arg arg);
+void win_to_ws(const union arg arg);
+void ws_go(const union arg arg);
 
 static void configure_request(XEvent *ev);
 static void map_request(XEvent *ev);
