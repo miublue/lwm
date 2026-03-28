@@ -30,7 +30,6 @@ static void (*events[LASTEvent])(XEvent *ev) = {
 #if FOCUS_ON_HOVER
     [EnterNotify]      = enter_notify,
 #endif
-    [ReparentNotify]   = reparent_notify,
     [KeyPress]         = key_press,
     [ButtonPress]      = button_press,
     [ButtonRelease]    = button_release,
@@ -199,19 +198,15 @@ static void enter_notify(XEvent *ev) {
     while (XCheckTypedEvent(display, EnterNotify, ev));
     int c = client_from_window(ev->xcrossing.window);
     if (c != -1) return win_focus(c);
-    for (c = 0; c < CURWS.size; ++c) {
-        if (WSWIN(c).child == ev->xcrossing.window)
-            return win_focus(c);
-    }
+    // XXX: apparently these values aren't optional, i'm forced to allocate and free this array
+    Window *children, parent, _root;
+    int num_children;
+    XQueryTree(display, ev->xcrossing.window, &_root, &parent, &children, &num_children);
+    if (num_children) XFree(children);
+    // if window doesn't exist, focus its parent
+    win_focus(client_from_window(parent));
 }
 #endif
-
-static void reparent_notify(XEvent *ev) {
-    int p = client_from_window(ev->xreparent.parent);
-    if (p == -1) return;
-    WSWIN(p).child = ev->xreparent.window;
-    retile();
-}
 
 static void key_press(XEvent *ev) {
     KeySym keysym = XkbKeycodeToKeysym(display, ev->xkey.keycode, 0, 0);
@@ -252,7 +247,6 @@ static void win_add(Window w) {
     assert(CURWS.size < MAX_WINDOWS);
     client_t client = {
         .wn = w,
-        .child = None,
         .is_full = 0,
         .is_float = (CURWS.mode == MODE_FLOAT),
     };
@@ -273,7 +267,6 @@ static void win_focus(int w) {
         CURWS.cur = CURWS.prev = 0;
         return;
     }
-    if (WSWIN(w).child != None) win_focus(client_from_window(WSWIN(w).child));
     if (w != CURWS.cur && !WSWIN(CURWS.cur).is_float) CURWS.prev = CURWS.cur;
     if (WSWIN(w).is_float) XRaiseWindow(display, WSWIN(w).wn);
     XSetInputFocus(display, WSWIN(w).wn, RevertToParent, CurrentTime);

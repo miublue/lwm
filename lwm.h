@@ -15,7 +15,7 @@
 enum { MODE_MONOCLE, MODE_NSTACK, MODE_FLOAT };
 
 typedef struct {
-    Window wn, child;
+    Window wn;
     int is_full, is_float;
     int x, y, w, h;
 } client_t;
@@ -58,7 +58,6 @@ static void unmap_notify(XEvent *ev);
 static void destroy_notify(XEvent *ev);
 static void motion_notify(XEvent *ev);
 static void enter_notify(XEvent *ev);
-static void reparent_notify(XEvent *ev);
 static void key_press(XEvent *ev);
 static void button_press(XEvent *ev);
 static void button_release(XEvent *ev);
