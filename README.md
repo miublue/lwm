@@ -1,10 +1,10 @@
 <h1 align="center">lwm</h1>
 <p align="center">Tiny X11 tiling window manager.</p>
-<img src="./img.png"/>
+<img src="./images/preview.png"/>
 
 - Programs shown in the screenshot are [lbar](https://github.com/miublue/lbar),
-[led](https://github.com/miublue/led), [lfm](https://github.com/miublue/lfm) and
-[lterm](https://github.com/miublue/lterm).
+[led](https://github.com/miublue/led), [lfm](https://github.com/miublue/lfm),
+[lterm](https://github.com/miublue/lterm) and [vim with momo theme](https://github.com/miublue/momo.vim).
 
 ## Features
 
