@@ -86,7 +86,6 @@ void win_rotate(const union arg arg) {
 
 void win_kill(const union arg arg) {
     if (CURWS.size == 0) return;
-    // XXX: properly close window lmfao
     XKillClient(display, WSWIN(CURWS.cur).wn);
 }
 
@@ -95,7 +94,7 @@ void win_full(const union arg arg) {
     if ((WSWIN(CURWS.cur).is_full = !WSWIN(CURWS.cur).is_full)) {
         XRaiseWindow(display, WSWIN(CURWS.cur).wn);
         XMoveResizeWindow(display, WSWIN(CURWS.cur).wn, -BORDER_SIZE, -BORDER_SIZE, screen_w, screen_h);
-    } else XLowerWindow(display, WSWIN(CURWS.cur).wn);
+    } else if (!WSWIN(CURWS.cur).is_float) XLowerWindow(display, WSWIN(CURWS.cur).wn);
     retile();
 }
 
@@ -124,6 +123,7 @@ void win_to_ws(const union arg arg) {
     win_add(c.wn);
     struct client *w = &WSWIN(CURWS.size-1);
     w->is_float = c.is_float, w->x = c.x, w->y = c.y, w->w = c.w, w->h = c.h;
+    win_focus(CURWS.size-1);
     cur_ws = ws;
     win_del(CURWS.cur);
     retile();
@@ -154,7 +154,6 @@ static void configure_request(XEvent *ev) {
 static void map_request(XEvent *ev) {
     Window wn = ev->xmaprequest.window;
     if (wn == None || client_from_window(wn) != -1) return;
-    if (CURWS.size) WSWIN(CURWS.cur).is_full = 0;
     XSelectInput(display, wn, StructureNotifyMask|EnterWindowMask);
     win_add(wn);
     XSetWindowBorderWidth(display, wn, BORDER_SIZE);
@@ -179,6 +178,7 @@ static void motion_notify(XEvent *ev) {
     int c = client_from_window(button_event.subwindow);
     if (c == -1 || WSWIN(c).is_full) return;
     WSWIN(c).is_float = 1;
+    XRaiseWindow(display, WSWIN(c).wn);
     const int xdiff = ev->xbutton.x_root - button_event.x_root;
     const int ydiff = ev->xbutton.y_root - button_event.y_root;
     XMoveResizeWindow(display, button_event.subwindow,
@@ -197,10 +197,9 @@ static void enter_notify(XEvent *ev) {
     int c = client_from_window(ev->xcrossing.window);
     if (c != -1) return win_focus(c);
     // XXX: apparently these values aren't optional, i'm forced to allocate and free this array
-    Window *children, parent, _root;
-    int num_children;
-    XQueryTree(display, ev->xcrossing.window, &_root, &parent, &children, &num_children);
-    if (num_children) XFree(children);
+    Window parent, _root, *_children; int _num_children;
+    XQueryTree(display, ev->xcrossing.window, &_root, &parent, &_children, &_num_children);
+    if (_num_children) XFree(_children);
     // if window doesn't exist, focus its parent
     win_focus(client_from_window(parent));
 }
@@ -219,6 +218,7 @@ static void button_press(XEvent *ev) {
     XGetWindowAttributes(display, ev->xbutton.subwindow, &hover_attr);
     button_event = ev->xbutton;
     int c = client_from_window(ev->xbutton.subwindow);
+    if (c == -1 || WSWIN(c).is_full) return;
     set_client_size(c);
     win_focus(c);
 }
@@ -295,7 +295,6 @@ static void tile(void) {
     case MODE_NSTACK: tile_nstack(); break;
     default: break;
     }
-    if (WSWIN(CURWS.cur).is_float) XRaiseWindow(display, WSWIN(CURWS.cur).wn);
 }
 
 static void tile_monocle(void) {
