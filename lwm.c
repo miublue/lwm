@@ -64,17 +64,17 @@ void nmaster(const union arg arg) {
 }
 
 void win_next(const union arg arg) {
-    if (CURWS.size < 2 || (CURWS.size && WSWIN(CURWS.cur).is_full)) return;
+    if (CURWS.size < 2 || WSWIN(CURWS.cur).is_full) return;
     win_focus(CURWS.cur+1 >= CURWS.size? 0 : CURWS.cur+1);
 }
 
 void win_prev(const union arg arg) {
-    if (CURWS.size < 2 || (CURWS.size && WSWIN(CURWS.cur).is_full)) return;
+    if (CURWS.size < 2 || WSWIN(CURWS.cur).is_full) return;
     win_focus(CURWS.cur-1 < 0? CURWS.size-1 : CURWS.cur-1);
 }
 
 void win_rotate(const union arg arg) {
-    if (CURWS.size < 2 || (CURWS.size && WSWIN(CURWS.cur).is_full)) return;
+    if (CURWS.size < 2 || WSWIN(CURWS.cur).is_full) return;
     int idx = (CURWS.cur + arg.i);
     if (idx < 0) idx = (CURWS.size-1);
     if (idx >= CURWS.size) idx = 0;
@@ -99,14 +99,14 @@ void win_full(const union arg arg) {
 }
 
 void win_float(const union arg arg) {
-    if (CURWS.size == 0 || (CURWS.size && WSWIN(CURWS.cur).is_full)) return;
+    if (CURWS.size == 0 || WSWIN(CURWS.cur).is_full || button_event.subwindow != None) return;
     WSWIN(CURWS.cur).is_float = !WSWIN(CURWS.cur).is_float;
     XLowerWindow(display, WSWIN(CURWS.cur).wn);
     win_focus(CURWS.cur);
 }
 
 void win_center(const union arg arg) {
-    if (CURWS.size == 0) return;
+    if (CURWS.size == 0 || button_event.subwindow != None) return;
     struct client *c = &WSWIN(CURWS.cur);
     c->x = (screen_w/2) - (c->w/2);
     c->y = (screen_h/2) - (c->h/2);
@@ -192,7 +192,7 @@ static void motion_notify(XEvent *ev) {
 
 #if FOCUS_ON_HOVER
 static void enter_notify(XEvent *ev) {
-    if (button_event.subwindow != None) return;
+    if (button_event.subwindow != None || !CURWS.size || WSWIN(CURWS.cur).is_full) return;
     while (XCheckTypedEvent(display, EnterNotify, ev));
     int c = client_from_window(ev->xcrossing.window);
     if (c != -1) return win_focus(c);
@@ -214,7 +214,7 @@ static void key_press(XEvent *ev) {
 }
 
 static void button_press(XEvent *ev) {
-    if (ev->xbutton.subwindow == None) return;
+    if (ev->xbutton.subwindow == None || !CURWS.size || WSWIN(CURWS.cur).is_full) return;
     XGetWindowAttributes(display, ev->xbutton.subwindow, &hover_attr);
     button_event = ev->xbutton;
     int c = client_from_window(ev->xbutton.subwindow);
@@ -256,6 +256,7 @@ static void win_del(int w) {
 }
 
 static void win_focus(int w) {
+    if (button_event.subwindow != None) return;
     if (w < 0 || CURWS.size == 0) {
         XSetInputFocus(display, root, RevertToParent, CurrentTime);
         CURWS.cur = CURWS.prev = 0;
@@ -271,7 +272,7 @@ static void win_focus(int w) {
 }
 
 static void retile(void) {
-    if (CURWS.size && WSWIN(CURWS.cur).is_full) return;
+    if (!CURWS.size || WSWIN(CURWS.cur).is_full) return;
     XEvent ev;
     if (CURWS.prev < CURWS.size && !WSWIN(CURWS.prev).is_float) XLowerWindow(display, WSWIN(CURWS.prev).wn);
     for (int i = CURWS.size-1; i >= 0; --i) {
