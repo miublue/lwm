@@ -5,6 +5,7 @@
 // That's 100 windows per workspace. If you need that many,
 // or even more than that, you may have a serious problem.
 #define MAX_WINDOWS 100
+#define MAX_WORKSPACES 10
 
 #define MIN(a, b) ((a) < (b)? (a) : (b))
 #define MAX(a, b) ((a) > (b)? (a) : (b))

@@ -11,7 +11,7 @@
 static Display *display;
 static Window root;
 static int screen_w, screen_h;
-static struct workspace workspaces[10] = {0};
+static struct workspace workspaces[MAX_WORKSPACES] = {0};
 static XColor border_normal, border_select;
 static XButtonEvent button_event;
 static XWindowAttributes hover_attr;
@@ -170,7 +170,12 @@ static void unmap_notify(XEvent *ev) {
 }
 
 static void destroy_notify(XEvent *ev) {
-    win_del(client_from_window(ev->xdestroywindow.window));
+    int cur = cur_ws;
+    for (cur_ws = 0; cur_ws < MAX_WORKSPACES; ++cur_ws) {
+        int c = client_from_window(ev->xdestroywindow.window);
+        win_del(c);
+    }
+    cur_ws = cur;
     retile();
 }
 
@@ -381,7 +386,7 @@ int main(void) {
 
     XSelectInput(display, root, SubstructureRedirectMask);
     grab_input();
-    for (int i = 0; i < 10; ++i) {
+    for (int i = 0; i < MAX_WORKSPACES; ++i) {
         workspaces[i].size = workspaces[i].prev = workspaces[i].cur = 0;
         workspaces[i].mode = workspaces[i].prev_mode = DEFAULT_MODE;
         workspaces[i].masterw = screen_w * MASTERW;
