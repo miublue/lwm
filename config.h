@@ -7,6 +7,7 @@
 #define GAPSIZE 5
 #define MASTERW 0.5
 #define NMASTER 1
+#define NEW_WINDOW_FIRST 0
 #define DEFAULT_MODE MODE_NSTACK
 #define FOCUS_ON_HOVER 1
 #define BORDER_SIZE 2

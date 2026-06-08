@@ -63,7 +63,7 @@ static void button_press(XEvent *ev);
 static void button_release(XEvent *ev);
 
 static void grab_input(void);
-static void win_add(Window w);
+static int win_add(Window w);
 static void win_del(int w);
 static void win_focus(int w);
 static void retile(void);

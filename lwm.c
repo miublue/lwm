@@ -10,12 +10,11 @@
 
 static Display *display;
 static Window root;
-static int screen_w, screen_h;
+static int screen_w, screen_h, cur_ws = 0;
 static struct workspace workspaces[MAX_WORKSPACES] = {0};
 static XColor border_normal, border_select;
 static XButtonEvent button_event;
 static XWindowAttributes hover_attr;
-static int cur_ws = 0;
 static const int topgap = BOTTOMBAR? 0 : TOPGAP;
 
 #define CURWS workspaces[cur_ws]
@@ -108,8 +107,7 @@ void win_float(const union arg arg) {
 void win_center(const union arg arg) {
     if (CURWS.size == 0 || button_event.subwindow != None) return;
     struct client *c = &WSWIN(CURWS.cur);
-    c->x = (screen_w/2) - (c->w/2);
-    c->y = (screen_h/2) - (c->h/2);
+    c->x = (screen_w/2) - (c->w/2), c->y = (screen_h/2) - (c->h/2);
     if (c->is_full || !c->is_float) return;
     retile();
 }
@@ -120,10 +118,10 @@ void win_to_ws(const union arg arg) {
     struct client c = WSWIN(CURWS.cur);
     XUnmapWindow(display, c.wn);
     cur_ws = arg.i;
-    win_add(c.wn);
-    struct client *w = &WSWIN(CURWS.size-1);
+    int pos = win_add(c.wn);
+    struct client *w = &WSWIN(pos);
     w->is_float = c.is_float, w->x = c.x, w->y = c.y, w->w = c.w, w->h = c.h;
-    win_focus(CURWS.size-1);
+    win_focus(pos);
     cur_ws = ws;
     win_del(CURWS.cur);
     retile();
@@ -155,12 +153,12 @@ static void map_request(XEvent *ev) {
     Window wn = ev->xmaprequest.window;
     if (wn == None || client_from_window(wn) != -1) return;
     XSelectInput(display, wn, StructureNotifyMask|EnterWindowMask);
-    win_add(wn);
+    int pos = win_add(wn);
     XSetWindowBorderWidth(display, wn, BORDER_SIZE);
     XSetWindowBorder(display, wn, border_normal.pixel);
     XMapWindow(display, wn);
     XLowerWindow(display, wn);
-    win_focus(CURWS.size-1);
+    win_focus(pos);
     win_center((const union arg){0});
 }
 
@@ -171,10 +169,8 @@ static void unmap_notify(XEvent *ev) {
 
 static void destroy_notify(XEvent *ev) {
     int cur = cur_ws;
-    for (cur_ws = 0; cur_ws < MAX_WORKSPACES; ++cur_ws) {
-        int c = client_from_window(ev->xdestroywindow.window);
-        win_del(c);
-    }
+    for (cur_ws = 0; cur_ws < MAX_WORKSPACES; ++cur_ws)
+        win_del(client_from_window(ev->xdestroywindow.window));
     cur_ws = cur;
     retile();
 }
@@ -244,13 +240,22 @@ static void grab_input(void) {
     XGrabButton(display, AnyButton, MOD, root, 1, mask, GrabModeAsync, GrabModeAsync, None, None);
 }
 
-static void win_add(Window w) {
-    if (w == None) return;
+static int win_add(Window w) {
+    if (w == None) return CURWS.cur;
     if (CURWS.size) WSWIN(CURWS.cur).is_full = 0;
     assert(CURWS.size < MAX_WINDOWS);
     struct client client = { .wn = w, .is_full = 0, .is_float = (CURWS.mode == MODE_FLOAT) };
-    CURWS.list[CURWS.size++] = client;
-    set_client_size(CURWS.size-1);
+    int pos = (NEW_WINDOW_FIRST)? 0 : CURWS.size;
+#if NEW_WINDOW_FIRST
+    for (int i = CURWS.size+1; i > 0; --i) CURWS.list[i] = CURWS.list[i-1];
+    CURWS.list[0] = client;
+    ++CURWS.cur; // current window has moved by one too
+#else
+    CURWS.list[CURWS.size] = client;
+#endif
+    ++CURWS.size;
+    set_client_size(pos);
+    return pos;
 }
 
 static void win_del(int w) {
@@ -317,8 +322,7 @@ static void tile_nstack(void) {
     const int stackgap = (BORDER_SIZE*2)+GAPSIZE;
     const int y_space = screen_h-TOPGAP-GAPSIZE;
     const int stack_w = screen_w-CURWS.masterw;
-    int stack_h, master_h;
-    int num_master = 0, num_tiled = 0, first_stack = -1;
+    int stack_h, master_h, num_master = 0, num_tiled = 0, first_stack = -1;
 
     for (int i = 0; i < CURWS.size; ++i) {
         if (WSWIN(i).is_float) continue;
@@ -340,18 +344,18 @@ static void tile_nstack(void) {
         return;
     }
 
-    master_h = y_space / num_master;
-    stack_h = y_space / (num_tiled - num_master);
+    master_h = (y_space / num_master), stack_h = (y_space / (num_tiled - num_master));
     for (int i = 0, cur = 0; i < CURWS.size && cur < num_tiled; ++i) {
         if (WSWIN(i).is_float) continue;
-        if (cur < num_master)
+        if (cur < num_master) {
             XMoveResizeWindow(display, WSWIN(i).wn,
                 GAPSIZE, (topgap+GAPSIZE) + (master_h * cur),
                 CURWS.masterw - stackgap, master_h - stackgap);
-        else
+        } else {
             XMoveResizeWindow(display, WSWIN(i).wn,
                 CURWS.masterw+GAPSIZE, (topgap+GAPSIZE) + (stack_h * (cur-num_master)),
                 stack_w - gapdist, stack_h - stackgap);
+        }
         ++cur;
     }
 }
