@@ -21,7 +21,8 @@ struct client {
 };
 
 struct workspace {
-    unsigned char prev, cur, mode, prev_mode, size;
+    // prev -> previously tiled window, last -> last focused window
+    unsigned char prev, last, cur, mode, prev_mode, size;
     int masterw, nmaster;
     struct client list[MAX_WINDOWS];
 };

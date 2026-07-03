@@ -262,16 +262,17 @@ static void win_del(int w) {
     if (w < 0 || CURWS.size == 0) return;
     CURWS.size--;
     for (int i = w; i < CURWS.size; ++i) CURWS.list[i] = CURWS.list[i+1];
-    win_focus(MIN(CURWS.cur, CURWS.size-1));
+    win_focus(MIN(w < CURWS.last? CURWS.last-1 : CURWS.last, CURWS.size-1));
 }
 
 static void win_focus(int w) {
     if (button_event.subwindow != None) return;
     if (w < 0 || CURWS.size == 0) {
         XSetInputFocus(display, root, RevertToParent, CurrentTime);
-        CURWS.cur = CURWS.prev = 0;
+        CURWS.cur = CURWS.prev = CURWS.last = 0;
         return;
     }
+    CURWS.last = CURWS.cur;
     if (w != CURWS.cur && !WSWIN(CURWS.cur).is_float) CURWS.prev = CURWS.cur;
     if (WSWIN(w).is_float) XRaiseWindow(display, WSWIN(w).wn);
     XSetInputFocus(display, WSWIN(w).wn, RevertToParent, CurrentTime);
@@ -391,7 +392,7 @@ int main(void) {
     XSelectInput(display, root, SubstructureRedirectMask);
     grab_input();
     for (int i = 0; i < MAX_WORKSPACES; ++i) {
-        workspaces[i].size = workspaces[i].prev = workspaces[i].cur = 0;
+        workspaces[i].size = workspaces[i].prev = workspaces[i].last = workspaces[i].cur = 0;
         workspaces[i].mode = workspaces[i].prev_mode = DEFAULT_MODE;
         workspaces[i].masterw = screen_w * MASTERW;
         workspaces[i].nmaster = NMASTER;
