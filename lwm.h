@@ -7,6 +7,10 @@
 #define MAX_WINDOWS 100
 #define MAX_WORKSPACES 10
 
+// This is the file to dump WM information, such as current workspace,
+// is current window fullscreen, etc. See function `desktop_info`.
+#define INFO_FILE "/tmp/lwm.info"
+
 #define MIN(a, b) ((a) < (b)? (a) : (b))
 #define MAX(a, b) ((a) > (b)? (a) : (b))
 #define LEN(x) (sizeof(x) / sizeof((x)[0]))
@@ -73,6 +77,7 @@ static void tile_monocle(void);
 static void tile_nstack(void);
 static int client_from_window(Window w);
 static void set_client_size(int w);
+static void desktop_info(void);
 
 static int xerror() { return 0; }
 #endif

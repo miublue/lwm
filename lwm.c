@@ -4,6 +4,7 @@
 #include <assert.h>
 #include <signal.h>
 #include <unistd.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include "lwm.h"
 #include "config.h"
@@ -15,6 +16,7 @@ static struct workspace workspaces[MAX_WORKSPACES] = {0};
 static XColor border_normal, border_select;
 static XButtonEvent button_event;
 static XWindowAttributes hover_attr;
+static FILE *info_file;
 static const int topgap = BOTTOMBAR? 0 : TOPGAP;
 
 #define CURWS workspaces[cur_ws]
@@ -283,6 +285,7 @@ static void win_focus(int w) {
 }
 
 static void retile(void) {
+    desktop_info();
     if (!CURWS.size || WSWIN(CURWS.cur).is_full) return;
     XEvent ev;
     if (CURWS.prev < CURWS.size && !WSWIN(CURWS.prev).is_float) XLowerWindow(display, WSWIN(CURWS.prev).wn);
@@ -374,7 +377,16 @@ static void set_client_size(int w) {
     c->x = attr.x, c->y = attr.y, c->w = attr.width, c->h = attr.height;
 }
 
+static void desktop_info(void) {
+    struct client c = CURWS.size? WSWIN(CURWS.cur) : (struct client) {0};
+    rewind(info_file);
+    fprintf(info_file, "%d %d %d %d %d %d %d\n", MAX_WORKSPACES, cur_ws+1,
+        CURWS.mode, CURWS.size, c.wn, c.is_float, c.is_full);
+    fflush(info_file);
+}
+
 int main(void) {
+    if (!(info_file = fopen(INFO_FILE, "w+"))) return 1;
     if (!(display = XOpenDisplay(0))) return 1;
     signal(SIGCHLD, SIG_IGN);
     XSetErrorHandler(xerror);
@@ -397,7 +409,7 @@ int main(void) {
         workspaces[i].masterw = screen_w * MASTERW;
         workspaces[i].nmaster = NMASTER;
     }
-
+    desktop_info();
     XEvent ev;
     for (;;) {
         XNextEvent(display, &ev);
@@ -405,5 +417,6 @@ int main(void) {
     }
 
     XCloseDisplay(display);
+    fclose(info_file);
     return 0;
 }
