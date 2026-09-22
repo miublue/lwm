@@ -386,8 +386,14 @@ static void desktop_info(void) {
 }
 
 int main(void) {
-    if (!(info_file = fopen(INFO_FILE, "w+"))) return 1;
-    if (!(display = XOpenDisplay(0))) return 1;
+    if (!(info_file = fopen(INFO_FILE, "w+"))) {
+        fprintf(stderr, "error: failed to open file '%s'\n", INFO_FILE);
+        return 1;
+    }
+    if (!(display = XOpenDisplay(0))) {
+        fprintf(stderr, "error: failed to open display\n");
+        return 1;
+    }
     signal(SIGCHLD, SIG_IGN);
     XSetErrorHandler(xerror);
     system(INIT_SCRIPT);
