@@ -3,9 +3,10 @@
 #include <X11/XKBlib.h>
 #include <assert.h>
 #include <signal.h>
-#include <unistd.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
 #include "lwm.h"
 #include "config.h"
 
@@ -17,7 +18,7 @@ static XColor border_normal, border_select;
 static XButtonEvent button_event;
 static XWindowAttributes hover_attr;
 static FILE *info_file;
-static const int topgap = BOTTOMBAR? 0 : TOPGAP;
+static const int topgap = BOTTOM_BAR? 0 : BAR_SIZE;
 
 #define CURWS workspaces[cur_ws]
 #define WSWIN(wn) CURWS.list[wn]
@@ -50,44 +51,31 @@ void tile_mode(const union arg arg) {
     win_focus(CURWS.cur);
 }
 
-void incmaster(const union arg arg) {
-    if (CURWS.masterw < 100 && arg.i < 0) return;
-    if (CURWS.masterw > screen_w-100 && arg.i > 0) return;
+void master_scale(const union arg arg) {
     if (WSWIN(CURWS.cur).is_full) return;
-    CURWS.masterw += arg.i;
+    float s = CURWS.master_scale + arg.f;
+    CURWS.master_scale = s <= 0.10? 0.10 : s >= 0.90? 0.90 : s;
     retile();
 }
 
-void nmaster(const union arg arg) {
-    CURWS.nmaster += arg.i;
-    if (CURWS.nmaster < 0) CURWS.nmaster = 0;
+void num_master(const union arg arg) {
+    if ((CURWS.num_master += arg.i) < 0) CURWS.num_master = 0;
     retile();
 }
 
-void win_next(const union arg arg) {
+void win_switch(const union arg arg) {
     if (CURWS.size < 2 || WSWIN(CURWS.cur).is_full) return;
-    win_focus(CURWS.cur+1 >= CURWS.size? 0 : CURWS.cur+1);
-}
-
-void win_prev(const union arg arg) {
-    if (CURWS.size < 2 || WSWIN(CURWS.cur).is_full) return;
-    win_focus(CURWS.cur-1 < 0? CURWS.size-1 : CURWS.cur-1);
+    int n = CURWS.cur + arg.i;
+    win_focus(n < 0? CURWS.size-1 : n >= CURWS.size? 0 : n);
 }
 
 void win_rotate(const union arg arg) {
     if (CURWS.size < 2 || WSWIN(CURWS.cur).is_full) return;
     int idx = (CURWS.cur + arg.i);
-    if (idx < 0) idx = (CURWS.size-1);
-    if (idx >= CURWS.size) idx = 0;
+    idx = idx < 0? CURWS.size-1 : idx >= CURWS.size? 0 : idx;
     struct client cur = CURWS.list[CURWS.cur];
-    CURWS.list[CURWS.cur] = CURWS.list[idx];
-    CURWS.list[idx] = cur;
+    CURWS.list[CURWS.cur] = CURWS.list[idx], CURWS.list[idx] = cur;
     win_focus(idx);
-}
-
-void win_kill(const union arg arg) {
-    if (CURWS.size == 0) return;
-    XKillClient(display, WSWIN(CURWS.cur).wn);
 }
 
 void win_full(const union arg arg) {
@@ -114,6 +102,11 @@ void win_center(const union arg arg) {
     retile();
 }
 
+void win_kill(const union arg arg) {
+    if (CURWS.size == 0) return;
+    XKillClient(display, WSWIN(CURWS.cur).wn);
+}
+
 void win_to_ws(const union arg arg) {
     if (arg.i == cur_ws || CURWS.size == 0) return;
     int ws = cur_ws;
@@ -129,7 +122,7 @@ void win_to_ws(const union arg arg) {
     retile();
 }
 
-void ws_go(const union arg arg) {
+void ws_switch(const union arg arg) {
     if (arg.i == cur_ws) return;
     for (int i = 0; i < CURWS.size; ++i) XUnmapWindow(display, WSWIN(i).wn);
     cur_ws = arg.i;
@@ -162,6 +155,7 @@ static void map_request(XEvent *ev) {
     XLowerWindow(display, wn);
     win_focus(pos);
     win_center((const union arg){0});
+    retile();
 }
 
 static void unmap_notify(XEvent *ev) {
@@ -198,9 +192,12 @@ static void enter_notify(XEvent *ev) {
     if (button_event.subwindow != None || !CURWS.size || WSWIN(CURWS.cur).is_full) return;
     while (XCheckTypedEvent(display, EnterNotify, ev));
     int c = client_from_window(ev->xcrossing.window);
-    if (c != -1) return win_focus(c);
+    if (c != -1) {
+        win_focus(c);
+        return;
+    }
     // XXX: apparently these values aren't optional, i'm forced to allocate and free this array
-    Window parent, _root, *_children; int _num_children;
+    Window parent, _root, *_children; unsigned int _num_children;
     XQueryTree(display, ev->xcrossing.window, &_root, &parent, &_children, &_num_children);
     if (_num_children) XFree(_children);
     // if window doesn't exist, focus its parent
@@ -313,36 +310,38 @@ static void tile(void) {
 }
 
 static void tile_monocle(void) {
-    const int gapsz = (BORDER_SIZE+GAPSIZE)*2;
+    const int gapsz = (BORDER_SIZE+GAP_SIZE)*2;
     for (int i = 0; i < CURWS.size; ++i) {
         if (WSWIN(i).is_float) continue;
-        XMoveResizeWindow(display, WSWIN(i).wn, GAPSIZE, topgap+GAPSIZE,
-            screen_w-gapsz, screen_h-TOPGAP-gapsz);
+        XMoveResizeWindow(display, WSWIN(i).wn, GAP_SIZE, topgap+GAP_SIZE,
+            screen_w-gapsz, screen_h-BAR_SIZE-gapsz);
     }
 }
 
 static void tile_nstack(void) {
-    const int gapdist = (BORDER_SIZE+GAPSIZE)*2;
-    const int stackgap = (BORDER_SIZE*2)+GAPSIZE;
-    const int y_space = screen_h-TOPGAP-GAPSIZE;
-    const int stack_w = screen_w-CURWS.masterw;
+    const int gapdist = (BORDER_SIZE+GAP_SIZE)*2, stackgap = (BORDER_SIZE*2)+GAP_SIZE;
+    const int master_w = screen_w*CURWS.master_scale-BORDER_SIZE, stack_w = screen_w-master_w;
+    const int y_space = screen_h-BAR_SIZE-GAP_SIZE;
     int stack_h, master_h, num_master = 0, num_tiled = 0, first_stack = -1;
 
     for (int i = 0; i < CURWS.size; ++i) {
         if (WSWIN(i).is_float) continue;
         ++num_tiled;
-        if (num_master < CURWS.nmaster) ++num_master;
+        if (num_master < CURWS.num_master) ++num_master;
         else if (first_stack == -1) first_stack = i;
     }
-    if (num_tiled < 2) return tile_monocle();
+    if (num_tiled < 2) {
+        tile_monocle();
+        return;
+    }
     // if there are only master or stacked clients
     if (num_master >= num_tiled || num_master == 0 || first_stack == -1) {
         stack_h = y_space / num_tiled;
         for (int i = 0, cur = 0; i < CURWS.size && cur < num_tiled; ++i) {
             if (WSWIN(i).is_float) continue;
             XMoveResizeWindow(display, WSWIN(i).wn,
-                GAPSIZE, (topgap+GAPSIZE) + (stack_h * cur),
-                screen_w - gapdist, stack_h - stackgap);
+                GAP_SIZE, (topgap+GAP_SIZE) + stack_h*cur,
+                screen_w-gapdist, stack_h-stackgap);
             ++cur; // cur is only incremented if client is not floating
         }
         return;
@@ -353,12 +352,12 @@ static void tile_nstack(void) {
         if (WSWIN(i).is_float) continue;
         if (cur < num_master) {
             XMoveResizeWindow(display, WSWIN(i).wn,
-                GAPSIZE, (topgap+GAPSIZE) + (master_h * cur),
-                CURWS.masterw - stackgap, master_h - stackgap);
+                GAP_SIZE, topgap+GAP_SIZE+master_h*cur,
+                master_w-stackgap, master_h-stackgap);
         } else {
             XMoveResizeWindow(display, WSWIN(i).wn,
-                CURWS.masterw+GAPSIZE, (topgap+GAPSIZE) + (stack_h * (cur-num_master)),
-                stack_w - gapdist, stack_h - stackgap);
+                master_w+GAP_SIZE, topgap+GAP_SIZE+stack_h*(cur-num_master),
+                stack_w-gapdist, stack_h-stackgap);
         }
         ++cur;
     }
@@ -380,12 +379,22 @@ static void set_client_size(int w) {
 static void desktop_info(void) {
     struct client c = CURWS.size? WSWIN(CURWS.cur) : (struct client) {0};
     rewind(info_file);
-    fprintf(info_file, "%d %d %d %d %d %d %d\n", MAX_WORKSPACES, cur_ws+1,
+    fprintf(info_file, "%d %d %d %d %lu %d %d\n", MAX_WORKSPACES, cur_ws+1,
         CURWS.mode, CURWS.size, c.wn, c.is_float, c.is_full);
     fflush(info_file);
 }
 
-int main(void) {
+void usage(const char *prg, int err) {
+    printf("usage: %s [-v]\n", prg);
+    exit(err);
+}
+
+int main(int argc, char **argv) {
+    for (int i = 1; i < argc; ++i) {
+        if (!strcmp(argv[i], "-v")) { printf("%s %s\n", argv[0], VERSION); return 0; }
+        else if (!strcmp(argv[i], "-h")) usage(argv[0], 0);
+        else usage(argv[0], 1);
+    }
     if (!(info_file = fopen(INFO_FILE, "w+"))) {
         fprintf(stderr, "error: failed to open file '%s'\n", INFO_FILE);
         return 1;
@@ -399,10 +408,7 @@ int main(void) {
     system(INIT_SCRIPT);
 
     int s = DefaultScreen(display);
-    root = RootWindow(display, s);
-    screen_w = XDisplayWidth(display, s);
-    screen_h = XDisplayHeight(display, s);
-
+    root = RootWindow(display, s), screen_w = XDisplayWidth(display, s), screen_h = XDisplayHeight(display, s);
     XAllocNamedColor(display, DefaultColormap(display, s), BORDER_NORMAL, &border_normal, &border_normal);
     XAllocNamedColor(display, DefaultColormap(display, s), BORDER_SELECT, &border_select, &border_select);
     border_normal.pixel |= 0xff << 24, border_select.pixel |= 0xff << 24;
@@ -410,10 +416,10 @@ int main(void) {
     XSelectInput(display, root, SubstructureRedirectMask);
     grab_input();
     for (int i = 0; i < MAX_WORKSPACES; ++i) {
-        workspaces[i].size = workspaces[i].prev = workspaces[i].last = workspaces[i].cur = 0;
-        workspaces[i].mode = workspaces[i].prev_mode = DEFAULT_MODE;
-        workspaces[i].masterw = screen_w * MASTERW;
-        workspaces[i].nmaster = NMASTER;
+        workspaces[i] = (struct workspace) {
+            .mode = DEFAULT_MODE, .prev_mode = DEFAULT_MODE,
+            .master_scale = MASTER_SCALE, .num_master = NUM_MASTER,
+        };
     }
     desktop_info();
     XEvent ev;

@@ -10,6 +10,7 @@
 // This is the file to dump WM information, such as current workspace,
 // is current window fullscreen, etc. See function `desktop_info`.
 #define INFO_FILE "/tmp/lwm.info"
+#define VERSION "0.4.7"
 
 #define MIN(a, b) ((a) < (b)? (a) : (b))
 #define MAX(a, b) ((a) > (b)? (a) : (b))
@@ -27,14 +28,12 @@ struct client {
 struct workspace {
     // prev -> previously tiled window, last -> last focused window
     unsigned char prev, last, cur, mode, prev_mode, size;
-    int masterw, nmaster;
+    int num_master;
+    float master_scale;
     struct client list[MAX_WINDOWS];
 };
 
-union arg {
-    const char **com;
-    const int i;
-};
+union arg { const char **com; const int i; const float f; };
 
 struct key {
     unsigned int mod;
@@ -45,17 +44,16 @@ struct key {
 
 void exec(const union arg arg);
 void tile_mode(const union arg arg);
-void incmaster(const union arg arg);
-void nmaster(const union arg arg);
-void win_next(const union arg arg);
-void win_prev(const union arg arg);
+void master_scale(const union arg arg);
+void num_master(const union arg arg);
+void win_switch(const union arg arg);
 void win_rotate(const union arg arg);
-void win_kill(const union arg arg);
 void win_full(const union arg arg);
 void win_float(const union arg arg);
 void win_center(const union arg arg);
+void win_kill(const union arg arg);
 void win_to_ws(const union arg arg);
-void ws_go(const union arg arg);
+void ws_switch(const union arg arg);
 
 static void configure_request(XEvent *ev);
 static void map_request(XEvent *ev);
@@ -79,5 +77,5 @@ static int client_from_window(Window w);
 static void set_client_size(int w);
 static void desktop_info(void);
 
-static int xerror() { return 0; }
+static int xerror(struct _XDisplay *_d, XErrorEvent *_e) { (void)_d, (void)_e; return 0; }
 #endif
