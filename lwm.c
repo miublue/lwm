@@ -216,11 +216,11 @@ static void key_press(XEvent *ev) {
 static void button_press(XEvent *ev) {
     if (ev->xbutton.subwindow == None || !CURWS.size || WSWIN(CURWS.cur).is_full) return;
     XGetWindowAttributes(display, ev->xbutton.subwindow, &hover_attr);
-    button_event = ev->xbutton;
     int c = client_from_window(ev->xbutton.subwindow);
     if (c == -1 || WSWIN(c).is_full) return;
     set_client_size(c);
     win_focus(c);
+    button_event = ev->xbutton;
 }
 
 static void button_release(XEvent *ev) {
